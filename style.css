@@ -541,6 +541,15 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
 #help-replay-btn:hover { background: var(--accent-hover); transform: scale(1.06); }
 #help-replay-btn svg { margin-left: 2px; } /* optical centering for the play triangle */
 
+/* Keep or re-roll a freshly generated demo once it has played through (see pendingDemo). */
+#demo-review {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 20; display: none; gap: 8px; white-space: nowrap;
+}
+.view-pill.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.view-pill.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+.view-pill:disabled { opacity: 0.6; cursor: default; }
+
 /* ===================== Help mode: chat input (left panel) ===================== */
 #help-input-wrap { padding: 10px 12px; border-top: 1px solid var(--border); position: relative; }
 #help-input {
@@ -612,6 +621,7 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
 .help-bubble {
     padding: 9px 13px; border-radius: 12px; font-size: 12.5px; line-height: 1.45;
     font-family: 'DM Sans', sans-serif; max-width: 92%;
+    white-space: pre-line; /* a taught move's numbered steps arrive one per line */
 }
 .help-user {
     align-self: flex-end; background: var(--accent); color: #fff;
@@ -636,8 +646,12 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
     transition: background 0.15s;
 }
 .learned-row:hover { background: var(--bg-input); }
-.learned-skill { text-transform: capitalize; }
-.learned-count { font-size: 10px; color: var(--text-3); font-family: 'DM Mono', monospace; }
+.learned-skill { text-transform: capitalize; flex: 1; }
+.learned-remove {
+    margin-left: 8px; width: 18px; height: 18px; border-radius: 50%; border: none;
+    background: transparent; color: var(--text-3); font-size: 14px; line-height: 1; cursor: pointer;
+}
+.learned-remove:hover { background: var(--error); color: #fff; }
 .learned-empty { padding: 20px 12px; font-size: 12px; color: var(--text-3); text-align: center; }
 
 /* ===================== Create mode: reference library (left panel) ===================== */

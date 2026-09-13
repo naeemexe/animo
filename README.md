@@ -129,7 +129,7 @@ It's one file, in this order:
 | **Filling a beat** | `actionSpan` / `sliceClip` / `fillBeat` — Kimodo pads a clip with a static pose, so the moving part is cut out and repeated to the beat's full length, identically for everyone in the beat. |
 | **Timeline** | `renderTimelineClips` (one row per character, plus a row for an object-led beat), `updatePlayhead`. |
 | **Editor & export** | Click-select, move/rotate/scale, the prop library, WebM video export, `.animo` scene save/load. |
-| **Chat mode** | `HELP_SYSTEM_PROMPT`, `askHelp` — the Q&A side. Only a "teach me X" answer spends a motion generation. `personaPlayOnly` keeps her three motions mutually exclusive, so a question arriving mid-hello can't leave two stacked. |
+| **Chat mode** | `HELP_SYSTEM_PROMPT`, `askHelp` — the Q&A side. Only a "teach me X" answer spends a motion generation, and a take you save to Learned (IndexedDB) replays whenever that move is asked for again. `personaPlayOnly` keeps her three motions mutually exclusive, so a question arriving mid-hello can't leave two stacked. |
 | **Voice** | ElevenLabs when a key is present, matched per character; otherwise the best voice the browser has installed. |
 | **Mode separation** | `setMode` + snapshots — Create and Chat keep entirely separate scenes, camera included. |
 

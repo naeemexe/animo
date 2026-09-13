@@ -1022,6 +1022,8 @@ function onPlaybackFinished() {
     isPlaying = false;
     playbackFinished = true;
     updatePlayPauseIcon();
+    // A freshly generated Chat demo has played through: keep it or roll another.
+    if (document.body.dataset.mode === 'help') showDemoReview();
 }
 
 function showGenLoadingOverlay(text) {
@@ -6341,7 +6343,7 @@ updateAuthBtn();
 
 // ========================================================================
 // BACKBOARD (persistent memory) — thin client with a localStorage fallback
-// so "Skills learned" and "Reference library" actually work today. Point
+// so the "Reference library" actually works today. Point
 // BACKBOARD_API_URL / BACKBOARD_API_KEY at a real Backboard project and
 // backboardGet/backboardSet below hit the real API instead.
 // ========================================================================
@@ -6375,29 +6377,74 @@ async function backboardSet(collection, items) {
     }
 }
 
-async function rememberSkill(skill) {
-    const list = await backboardGet('skills_learned');
-    const existing = list.find(s => s.skill.toLowerCase() === skill.toLowerCase());
-    if (existing) { existing.count++; existing.lastAsked = Date.now(); }
-    else list.unshift({ skill, count: 1, lastAsked: Date.now() });
-    await backboardSet('skills_learned', list);
-    return existing ? existing.count : 1;
+// ---- Saved demos ------------------------------------------------------------
+// Chat takes you've approved, so asking for that move again plays the same
+// take instead of generating a new one. A demo's BVH runs to a few hundred KB
+// and localStorage's ~5MB would be full after a handful, so these live in
+// IndexedDB. Like the rest of this memory, they belong to this browser at this
+// address.
+
+// One key per move however it's written: "Back flip", "backflips", "backflip".
+function skillKey(skill) {
+    return (skill || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/s$/, '');
 }
 
+// The move a question names, for when Gemini leaves "skill" out:
+// "show me how to do a backflip" -> "backflip".
+function skillFromQuestion(question) {
+    const lead = /^(please|can you|could you|show me|teach me|how do i|how can i|how to|learn|do|perform|a|an|the|some)\s+/;
+    let q = question.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+    while (lead.test(q)) q = q.replace(lead, '');
+    return q || question.trim();
+}
+
+function savedDemoStore(mode, run) {
+    return new Promise((resolve, reject) => {
+        const open = indexedDB.open('animo-saved-demos', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('demos', { keyPath: 'key' });
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+            const db = open.result;
+            const req = run(db.transaction('demos', mode).objectStore('demos'));
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+            db.close(); // takes effect once this transaction is done
+        };
+    });
+}
+const listSavedDemos = () => savedDemoStore('readonly', s => s.getAll());
+const saveDemo = (demo) => savedDemoStore('readwrite', s => s.put({ ...demo, key: skillKey(demo.skill), savedAt: Date.now() }));
+const deleteSavedDemo = (skill) => savedDemoStore('readwrite', s => s.delete(skillKey(skill)));
+
+// Learned is the moves with a kept take, and nothing else: an entry there
+// always plays the take you approved. (It used to list every move asked about,
+// which read as saved but generated a fresh, possibly worse, take when clicked.)
 async function renderLearnedList() {
     const listEl = document.getElementById('learned-list');
     if (!listEl) return;
-    const skills = await backboardGet('skills_learned');
+    const saved = await listSavedDemos().catch(() => []);
     listEl.innerHTML = '';
-    if (skills.length === 0) {
-        listEl.innerHTML = '<div class="learned-empty">Nothing yet — ask Help mode how to do something.</div>';
+    if (saved.length === 0) {
+        listEl.innerHTML = '<div class="learned-empty">Nothing saved yet. Ask how to do a move, then Save to Learned once a take looks right.</div>';
         return;
     }
-    skills.forEach(s => {
+    saved.sort((a, b) => b.savedAt - a.savedAt).forEach(d => {
         const row = document.createElement('div');
         row.className = 'learned-row';
-        row.innerHTML = `<span class="learned-skill">${s.skill}</span><span class="learned-count">${s.count > 1 ? `asked ${s.count}x` : ''}</span>`;
-        row.addEventListener('click', () => { setMode('help'); askHelp(`Teach me ${s.skill}`); });
+        const name = document.createElement('span');
+        name.className = 'learned-skill';
+        name.textContent = d.skill;
+        const remove = document.createElement('button');
+        remove.className = 'learned-remove';
+        remove.title = 'Forget this take; the next ask generates a new one';
+        remove.textContent = '×';
+        remove.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await deleteSavedDemo(d.skill).catch(err => console.warn('Removing the saved demo failed:', err));
+            renderLearnedList();
+        });
+        row.append(name, remove);
+        row.addEventListener('click', () => { setMode('help'); askHelp(`Teach me ${d.skill}`); });
         listEl.appendChild(row);
     });
 }
@@ -6474,18 +6521,25 @@ libRefFile.addEventListener('change', () => {
 // ========================================================================
 const HELP_SYSTEM_PROMPT = `You are a friendly, concise assistant that can physically demonstrate things in a 3D viewport — either by animating a human body, or by moving an object along a path (a car parking, a ball rolling, a door swinging). Given a user question, respond with ONLY valid JSON (no markdown, no backticks):
 
-{"answer":"spoken-friendly answer, 2-4 short sentences","demo_type":"human_motion"|"object_path"|"none","motion_prompt":"A person ...","object_keyword":"car","path":[{"t":0,"pos":[0,0,0],"yaw":0}],"steps":["step one","step two"]}
+{"answer":"spoken-friendly answer (see RULES for its length)","demo_type":"human_motion"|"object_path"|"none","motion_prompt":"A person ...","skill":"backflip","object_keyword":"car","path":[{"t":0,"pos":[0,0,0],"yaw":0}]}
 
 RULES:
 - demo_type "human_motion": the question is about a movement a PERSON'S BODY performs (backflip, push-up, riding a bike, a dance move, a stretch, a martial arts move). Set motion_prompt (MUST start with "A person", a single continuous demonstrable action, max ~8 seconds). Leave object_keyword/path empty.
 - demo_type "object_path": the question is about something an OBJECT/VEHICLE/MACHINE does, not the human body (parallel parking, how a car does a 3-point turn, a garage door opening, a ball rolling downhill). Set object_keyword to a simple one-word English noun for the object (e.g. "car", "boat", "bicycle") and path to 3-6 keyframes tracing its motion: {"t": seconds from 0, "pos": [x,y,z] offset in scene units from its start point (roughly -80..80 per axis), "yaw": facing angle in degrees, 0 = forward, positive = turning left}. Keep total duration under 8 seconds. Leave motion_prompt empty.
 - demo_type "none": factual/conceptual questions with nothing physical to demonstrate. Leave motion_prompt, object_keyword and path empty/blank.
-- steps: 2-4 short spoken cues in the order they happen during the demo (empty array if demo_type is "none").
-- Keep "answer" short — it will be read aloud.`;
+- skill: for "human_motion", the movement's plain name in 1-3 lowercase words ("backflip", "push-up", "dance move"). Leave it empty for the other demo types.
+- answer for "human_motion": teach the move. One short sentence introducing it, then 4-6 numbered steps, each on its own line ("1. ...\n2. ..."), in the order the body does them — setup, the key movement, the landing or finish — each a single short, concrete instruction the listener could follow.
+- answer for "object_path" or "none": 2-4 short sentences.
+- It will be read aloud, so no markdown beyond the step numbers.`;
 
-async function callGeminiHelp(question) {
+async function callGeminiHelp(question, savedSkills = []) {
+    // Naming a saved move exactly is what lets askHelp play that take instead
+    // of generating a new one.
+    const saved = savedSkills.length
+        ? `\n\nSAVED DEMOS: ${savedSkills.join(', ')}. If the question asks for one of these movements, set "skill" to exactly that name.`
+        : '';
     const data = await fetchGeminiWithRetry(GEMINI_URL, {
-        contents: [{ role: 'user', parts: [{ text: HELP_SYSTEM_PROMPT + '\n\nUser question: ' + question }] }],
+        contents: [{ role: 'user', parts: [{ text: HELP_SYSTEM_PROMPT + saved + '\n\nUser question: ' + question }] }],
         generationConfig: jsonGenConfig(0.6, 900)
     });
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -6749,10 +6803,34 @@ async function getChatMotionBvhs() {
 // Chat framing. The greeting and the conversation captions both sit along the
 // bottom of the viewport, so the persona is framed in the upper two-thirds:
 // look at knee height and the body reads above the text instead of behind it.
-// A demo needs room to move, so it pulls back.
-function frameChat(wide) {
-    camera.position.set(0, wide ? 190 : 115, wide ? 430 : 205);
-    controls.target.set(0, wide ? 90 : 85, 0);
+// A demo is framed on its own move instead — see frameChatDemo.
+function frameChat() {
+    camera.position.set(0, 115, 205);
+    controls.target.set(0, 85, 0);
+    controls.update();
+}
+
+// Frame a demo on the space the move actually uses. The fixed pulled-back shot
+// (430 units out) left her small in the frame however little the move
+// travelled; sampling the whole clip fits the camera to its reach instead —
+// up for a jump, out to the side for a step.
+const DEMO_FRAME_PAD = 25; // joints are centres; hair, hands and feet reach past them
+function frameChatDemo(entry) {
+    const box = new THREE.Box3(), p = new THREE.Vector3();
+    const SAMPLES = 40;
+    for (let s = 0; s <= SAMPLES; s++) {
+        entry.mixer.setTime((s / SAMPLES) * entry.mergedClip.duration / entry.mixer.timeScale);
+        entry.group.updateMatrixWorld(true);
+        entry.bones.traverse(b => { if (b.isBone) box.expandByPoint(b.getWorldPosition(p)); });
+    }
+    armCharacterAction(entry); // sampling ran the one-shot action to its end; rewind it
+    box.expandByScalar(DEMO_FRAME_PAD);
+    const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const fit = Math.max(size.y / 2 / tanHalf, size.x / 2 / (tanHalf * camera.aspect));
+    const dist = fit * 1.08 + size.z / 2; // a little breathing room, measured from the move's near side
+    camera.position.set(center.x, center.y + dist * 0.15, center.z + dist);
+    controls.target.copy(center);
     controls.update();
 }
 
@@ -6828,10 +6906,13 @@ async function showChatPersona({ keepTalking = false, greet = false } = {}) {
     // tabs during. Without this the persona would finish building into
     // whatever mode is on screen by then — landing her in Create's scene.
     if (document.body.dataset.mode !== 'help') return;
+    // She replaces whatever demo was on stage, so its controls go with it.
+    endDemoReview();
+    document.getElementById('help-replay-btn').style.display = 'none';
     clearAllCharacters();
     const entry = createCharacter(idleBvh, { label: 'Animo', yaw: CHAT_FACING_YAW, prompt: 'idle', avatar: avatarKey });
     syncPrimaryGlobals();
-    frameChat(false);
+    frameChat();
 
     // createCharacter() armed entry.action as a LoopOnce clip; both her
     // motions loop continuously instead, smoothed at the seam so the wrap
@@ -6884,8 +6965,83 @@ function clearHelpDemo() {
     personaWaveAction = null;
     if (helpDemoObject) { scene.remove(helpDemoObject); helpDemoObject = null; }
     document.getElementById('help-replay-btn').style.display = 'none';
+    endDemoReview();
 }
 document.getElementById('help-replay-btn').addEventListener('click', restartPlayback);
+
+// Put a demo motion on her: played once, slowed down, framed on the move.
+// Returns false if Chat is no longer on screen — generating takes long enough
+// to switch tabs during, and the motion mustn't land in Create's scene.
+function playHelpDemo(bvhText) {
+    if (document.body.dataset.mode !== 'help') return false;
+    chatPersonaIdle = false;          // a demo plays once, then holds
+    loadBVH(bvhText, '', avatarKey); // the demo is her too, not the mannequin; plays once, then pauses — see createPlaybackClock()
+    const entry = characters[0];
+    if (entry) {
+        entry.group.rotation.y = CHAT_FACING_YAW;
+        frameChatDemo(entry);
+    }
+    if (mixer) mixer.timeScale = 0.6; // slower, easier to follow
+    recomputePlaybackDuration(); // duration changed once timeScale was set above
+    document.getElementById('help-replay-btn').style.display = 'flex';
+    return true;
+}
+
+// A freshly generated take waits here, once it has played through, to be kept
+// or rolled again. Kimodo doesn't land every move every time (a backflip
+// especially), so the take worth showing is picked by eye; a kept one goes
+// into Learned and plays from then on instead of a new generation.
+let pendingDemo = null; // { skill, motionPrompt, bvh }
+const demoReview = document.getElementById('demo-review');
+const demoSaveBtn = document.getElementById('demo-save');
+const demoRetryBtn = document.getElementById('demo-retry');
+
+function showDemoReview() {
+    if (!pendingDemo) return;
+    demoSaveBtn.textContent = 'Save to Learned';
+    demoSaveBtn.disabled = demoRetryBtn.disabled = false;
+    demoReview.style.display = 'flex';
+}
+
+function endDemoReview() {
+    pendingDemo = null;
+    demoReview.style.display = 'none';
+}
+
+demoSaveBtn.addEventListener('click', async () => {
+    const demo = pendingDemo;
+    if (!demo) return;
+    demoSaveBtn.disabled = demoRetryBtn.disabled = true;
+    try {
+        await saveDemo(demo);
+        pendingDemo = null;
+        demoSaveBtn.textContent = `Saved "${demo.skill}" to Learned`;
+        renderLearnedList();
+        setTimeout(() => { if (!pendingDemo) demoReview.style.display = 'none'; }, 1500);
+    } catch (err) {
+        console.warn('Saving the demo failed:', err);
+        demoSaveBtn.textContent = "Couldn't save — try again";
+        demoSaveBtn.disabled = demoRetryBtn.disabled = false;
+    }
+});
+
+// Another take of the same move: same motion prompt, no new answer spoken.
+demoRetryBtn.addEventListener('click', async () => {
+    if (!pendingDemo) return;
+    const { skill, motionPrompt } = pendingDemo;
+    clearHelpDemo();
+    helpInput.disabled = true;
+    showGenLoadingOverlay('Generating another take...');
+    try {
+        const { bvhText, isFallback } = await fetchMotionBVH(motionPrompt, 6);
+        if (playHelpDemo(bvhText) && !isFallback) pendingDemo = { skill, motionPrompt, bvh: bvhText };
+    } catch (err) {
+        addHelpBubble('assistant', `Sorry — ${err.message}`);
+        await showChatPersona();
+    }
+    hideGenLoadingOverlay();
+    helpInput.disabled = false;
+});
 
 const HELP_INPUT_PLACEHOLDER = 'Ask anything, or teach me something...';
 const helpInput = document.getElementById('help-input');
@@ -6903,25 +7059,29 @@ async function askHelp(question) {
     // The persona keeps standing there and gesturing while it thinks — no
     // loading curtain for an ordinary reply, only for an actual demo below.
     try {
-        const result = await callGeminiHelp(question);
+        const savedDemos = await listSavedDemos().catch(() => []);
+        const result = await callGeminiHelp(question, savedDemos.map(d => d.skill));
         addHelpBubble('assistant', result.answer);
         speak(result.answer, () => setPersonaTalking(false), () => setPersonaTalking(true));
 
         if (result.demo_type === 'human_motion' && result.motion_prompt) {
             clearHelpDemo();
-            showGenLoadingOverlay('Generating demo...');
-            const skillName = question.replace(/^(teach me|how do i|how to|show me)\s*/i, '').trim() || question;
-            rememberSkill(skillName).then(renderLearnedList);
+            const skill = (result.skill || '').trim() || skillFromQuestion(question);
 
-            const { bvhText } = await fetchMotionBVH(result.motion_prompt, 6);
-            chatPersonaIdle = false;          // a demo plays once, then holds
-            frameChat(true);
-            loadBVH(bvhText, '', avatarKey); // the demo is her too, not the mannequin; plays once, then pauses — see createPlaybackClock()
-            if (characters[0]) characters[0].group.rotation.y = CHAT_FACING_YAW;
-            if (mixer) mixer.timeScale = 0.6; // slower, easier to follow
-            recomputePlaybackDuration(); // duration changed once timeScale was set above
-            document.getElementById('help-replay-btn').style.display = 'flex';
-            hideGenLoadingOverlay();
+            // A take kept earlier plays as it is: no generation, so no chance of
+            // a worse one. Matched on Gemini's name for the move, or on the
+            // question itself in case it named the move differently this time.
+            const keys = [skillKey(skill), skillKey(skillFromQuestion(question))];
+            const saved = savedDemos.find(d => keys.includes(d.key));
+            if (saved) {
+                playHelpDemo(saved.bvh);
+            } else {
+                showGenLoadingOverlay('Generating demo...');
+                const { bvhText, isFallback } = await fetchMotionBVH(result.motion_prompt, 6);
+                // A bundled sample standing in for a missing backend isn't a take of this move.
+                if (playHelpDemo(bvhText) && !isFallback) pendingDemo = { skill, motionPrompt: result.motion_prompt, bvh: bvhText };
+                hideGenLoadingOverlay();
+            }
 
         } else if (result.demo_type === 'object_path' && result.object_keyword && result.path && result.path.length > 0) {
             showGenLoadingOverlay('Generating demo...');

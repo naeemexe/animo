@@ -68,6 +68,10 @@
             <button id="help-replay-btn" class="help-only" title="Replay demo" style="display:none">
                 <svg width="12" height="14" viewBox="0 0 10 12"><path d="M1 0.5v11l8.5-5.5z" fill="currentColor"/></svg>
             </button>
+            <div id="demo-review" class="help-only">
+                <button id="demo-retry" class="view-pill" title="Generate a different take of this move">Try again</button>
+                <button id="demo-save" class="view-pill primary" title="Keep this take: asking for this move again plays it instead of generating">Save to Learned</button>
+            </div>
             <div id="create-welcome" class="create-only">
                 <div id="create-intro">
                     <h2 class="w-title">Animo 1.0</h2>
@@ -130,7 +134,7 @@
                 </div>
             </div>
             <div id="learned-tab-content" class="help-only" style="display:none">
-                <div id="learned-hint">Skills you've asked about, remembered across sessions.</div>
+                <div id="learned-hint">Takes you've saved. Asking for one of these moves plays that exact take instead of generating a new one.</div>
                 <div id="learned-list"></div>
             </div>
         </div>
