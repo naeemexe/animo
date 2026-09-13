@@ -1,1 +1,683 @@
 
+:root {
+    --bg: #eef3e0; --bg-panel: rgba(248,250,238,0.6); --bg-input: rgba(255,255,255,0.4);
+    --border: rgba(163,189,110,0.35); --border-focus: #7c9a3e;
+    --text: #2b3320; --text-2: #62704a; --text-3: #93a17a;
+    --accent: #7c9a3e; --accent-light: rgba(190,214,120,0.28); --accent-hover: #6b8535;
+    --success: #2d8a4e; --error: #c53030; --info: #2563eb;
+    --glass-blur: blur(18px);
+    --shadow-sm: 0 1px 3px rgba(70,90,30,0.07);
+    --shadow-md: 0 4px 16px rgba(70,90,30,0.1);
+    --shadow-lg: 0 8px 30px rgba(70,90,30,0.14);
+    --radius: 8px;
+    /* The width below which the layout stops shrinking and scrolls instead.
+       Roughly panel (360) + a usable 3D viewport, with room for the topbar's
+       centred title to clear the buttons on both sides. */
+    --app-min: 860px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: linear-gradient(160deg, #f4f8e8 0%, #eaf2d8 45%, #dfeec8 100%) fixed;
+    color: var(--text); font-family: 'DM Sans', sans-serif; height: 100vh;
+    /* Sideways scroll below --app-min rather than letting components overlap:
+       vertical stays hidden so the app itself never gains a page scrollbar. */
+    overflow-y: hidden; overflow-x: auto;
+}
+
+/* Top bar */
+#topbar {
+    height: 52px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px; gap: 16px;
+    box-shadow: var(--shadow-sm); backdrop-filter: var(--glass-blur);
+    position: relative; min-width: var(--app-min);
+}
+/* Centred on the window rather than sitting at the left edge. Absolute so it
+   centres on the bar itself and not on whatever space the flex row has left
+   over, which would drift as buttons show and hide per mode. Being out of the
+   flex flow, it cannot push the buttons aside — the bar's min-width is what
+   guarantees they never reach it. */
+#topbar h1 {
+    font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 600;
+    color: var(--accent); letter-spacing: 3px;
+    position: absolute; left: 50%; transform: translateX(-50%);
+    margin: 0; white-space: nowrap;
+}
+.status-pill {
+    font-size: 10px; padding: 4px 12px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; font-weight: 500; letter-spacing: 0.5px;
+    background: var(--bg-input); color: var(--text-3); border: 1px solid var(--border);
+    transition: all 0.3s;
+}
+.status-pill.active {
+    color: var(--accent); border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* Main layout */
+#main { display: flex; height: calc(100vh - 52px); min-width: var(--app-min); }
+
+/* 3D viewport */
+#viewport { flex: 1; position: relative; background: var(--bg); min-width: 420px; }
+#viewport canvas { width: 100% !important; height: 100% !important; }
+#gen-info {
+    position: absolute; top: 16px; left: 16px;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text-2); background: rgba(248,250,238,0.88); padding: 8px 14px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    backdrop-filter: blur(8px); box-shadow: var(--shadow-sm);
+}
+
+/* Right panel */
+#panel {
+    width: 360px; background: var(--bg-panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; box-shadow: 2px 0 12px rgba(70,90,30,0.06);
+    /* Width, not flex-basis: #panel.collapsed sets width:0 to slide it away. */
+    flex-shrink: 0;
+    backdrop-filter: var(--glass-blur);
+    order: -1;
+}
+#panel-header {
+    padding: 0; border-bottom: 1px solid var(--border);
+    display: flex; align-items: stretch;
+}
+.panel-tab {
+    flex: 1; padding: 12px 16px; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--text-3); letter-spacing: 1px; text-transform: uppercase;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    transition: all 0.2s; text-align: center;
+}
+.panel-tab:hover { color: var(--text-2); background: var(--bg-input); }
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+#panel-collapse-wrap { display: flex; align-items: center; padding: 0 8px; }
+#add-tab-content {
+    flex: 1; display: none; flex-direction: column; overflow: hidden;
+}
+#add-tab-content.visible { display: flex; }
+#add-tab-grid {
+    flex: 1; overflow-y: auto; display: grid;
+    grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px;
+    align-content: start;
+}
+#add-tab-grid::-webkit-scrollbar { width: 4px; }
+#add-tab-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* Console — compact chat log */
+#console {
+    flex: 1; overflow-y: auto; padding: 8px 10px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px;
+    line-height: 1.4; background: var(--bg);
+    display: flex; flex-direction: column; gap: 5px;
+}
+#console::-webkit-scrollbar { width: 3px; }
+#console::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.log-line {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 7px 12px; border-radius: 10px;
+    background: var(--bg-panel); border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    animation: log-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes log-slide-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.log-line .log-icon {
+    width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+}
+.log-line .log-msg { flex: 1; }
+.log-system .log-icon { background: #9ca3af; }
+.log-system .log-msg { color: #9ca3af; }
+.log-agent .log-icon { background: var(--accent); }
+.log-agent .log-msg { color: var(--accent); font-weight: 500; }
+.log-success .log-icon { background: #22a55b; }
+.log-success .log-msg { color: #22a55b; }
+.log-error .log-icon { background: #dc2626; }
+.log-error .log-msg { color: #dc2626; }
+.log-motion .log-icon { background: #0284c7; }
+.log-motion .log-msg { color: #0284c7; }
+.log-scene .log-icon { background: #d97706; }
+.log-scene .log-msg { color: #d97706; }
+.log-render .log-icon { background: #059669; }
+.log-render .log-msg { color: #059669; }
+.log-path .log-icon { background: #7c3aed; }
+.log-path .log-msg { color: #7c3aed; }
+.log-music .log-icon { background: #e85d9a; }
+.log-music .log-msg { color: #e85d9a; }
+
+/* Chat input bar at bottom of panel */
+#chat-input-bar {
+    padding: 10px 12px; border-top: 1px solid var(--border);
+    background: var(--bg-panel);
+}
+#chat-input {
+    width: 100%; height: 36px; padding: 0 12px; box-sizing: border-box;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 12px;
+    font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color 0.2s;
+}
+#chat-input:focus { border-color: var(--accent); }
+#chat-input::placeholder { color: var(--text-3); }
+#chat-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.log-line.log-user .log-icon { background: var(--accent); }
+.log-line.log-user .log-msg { color: var(--accent); font-weight: 500; }
+
+/* Hidden prompt elements (used by JS) */
+#path-toggle.active, #bbox-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Loading shimmer */
+.shimmer {
+    height: 3px; background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    background-size: 200% 100%; animation: shimmer 1.5s infinite;
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 30;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Full-viewport loading overlay — hides the stale scene while a new one generates */
+#gen-loading-overlay {
+    position: absolute; inset: 0; z-index: 40;
+    background: var(--bg);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px;
+}
+#gen-loading-overlay.visible { display: flex; }
+#gen-loading-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    animation: gen-spin 0.8s linear infinite;
+}
+@keyframes gen-spin { to { transform: rotate(360deg); } }
+#gen-loading-text {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-2);
+}
+
+/* ====== TIMELINE ====== */
+#timeline-bar {
+    position: absolute; bottom: 12px; left: 12px; right: 12px;
+    min-height: 44px; background: rgba(248,250,238,0.92);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border); border-radius: 10px;
+    display: none; align-items: center; padding: 0 10px; gap: 0;
+    font-family: 'DM Mono', monospace; z-index: 20;
+    box-shadow: var(--shadow-md);
+}
+#timeline-bar.visible { display: flex; }
+#timeline-playhead {
+    position: absolute; top: 0; width: 2px; height: 100%;
+    background: var(--accent); z-index: 25; pointer-events: none;
+}
+#timeline-playhead::before {
+    content: ''; position: absolute; top: -1px; left: -5px;
+    width: 0; height: 0;
+    border-left: 6px solid transparent; border-right: 6px solid transparent;
+    border-top: 7px solid var(--accent);
+}
+#timeline-clips {
+    display: flex; flex-direction: column; justify-content: center;
+    flex: 1; overflow-x: auto; gap: 4px; padding: 5px 4px;
+}
+#timeline-clips::-webkit-scrollbar { height: 0; }
+/* One row per character, so each person's beats line up on their own track */
+.timeline-row { display: flex; align-items: center; gap: 2px; }
+.timeline-row-label {
+    flex-shrink: 0; width: 22px; font-family: 'DM Mono', monospace;
+    font-size: 9px; font-weight: 600; color: var(--text-3); letter-spacing: 0.5px;
+}
+.timeline-clip {
+    height: 30px; background: var(--accent-light); border: 1px solid rgba(124,154,62,0.25);
+    border-radius: 4px; display: flex; align-items: center;
+    padding: 0 22px 0 10px; font-size: 10px; color: var(--accent);
+    white-space: nowrap; cursor: pointer; flex-shrink: 0;
+    transition: all 0.15s; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis;
+    position: relative;
+}
+.timeline-clip:hover { border-color: var(--accent); }
+.timeline-clip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.timeline-clip.selected { outline: 2px solid var(--error); outline-offset: -1px; }
+.timeline-clip .clip-dur {
+    color: inherit; opacity: 0.5; margin-left: 6px; font-size: 9px; font-weight: 400;
+}
+.timeline-clip .clip-remove {
+    position: absolute; top: 3px; right: 3px; width: 16px; height: 16px;
+    border-radius: 50%; border: none; background: rgba(0,0,0,0.12); color: inherit;
+    font-size: 12px; line-height: 1; cursor: pointer; opacity: 0.55; /* always there, so any beat can be removed */
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.15s, background 0.15s;
+}
+.timeline-clip:hover .clip-remove { opacity: 0.85; }
+.timeline-clip .clip-remove:hover { opacity: 1; background: var(--error); color: #fff; }
+
+
+#panel { transition: width 0.3s ease, opacity 0.3s ease; }
+#panel.collapsed { width: 0; min-width: 0; overflow: hidden; border: none; opacity: 0; }
+/* The slide above is for collapse/reopen. A mode switch also changes the
+   panel's width (half the window in Chat, a rail in Create), and that one is
+   applied at once — see setMode. */
+#panel.instant { transition: none; }
+#panel-reopen {
+    position: absolute; top: 8px; left: 8px; z-index: 15;
+    width: 28px; height: 28px; border-radius: 6px;
+    background: rgba(248,250,238,0.85); border: 1px solid var(--border);
+    color: var(--text-2); cursor: pointer; font-size: 12px;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-sm); backdrop-filter: blur(8px);
+    transition: opacity 0.2s;
+}
+#panel-reopen.visible { display: flex; }
+#create-controls {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 15; display: none; gap: 6px;
+}
+#create-controls.visible { display: flex; }
+.view-pill {
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(248,250,238,0.88); border: 1px solid var(--border);
+    color: var(--text-2); cursor: pointer; font-size: 11px;
+    font-family: 'DM Sans', sans-serif; font-weight: 500;
+    box-shadow: var(--shadow-sm); backdrop-filter: blur(8px);
+}
+.view-pill:hover { background: rgba(248,250,238,0.95); border-color: var(--accent); color: var(--accent); }
+#timeline-controls {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    padding-right: 6px; border-right: 1px solid var(--border); margin-right: 4px;
+}
+.tl-btn {
+    width: 30px; height: 30px; background: transparent; border: none;
+    border-radius: 4px; color: var(--text-2); cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s;
+}
+.tl-btn:hover { background: var(--accent-light); color: var(--accent); }
+.tl-time {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-3);
+    min-width: 38px; text-align: center;
+}
+/* ====== WELCOME LAYOUT — quick-start example buttons, Chat and Create ====== */
+.w-examples {
+    display: flex; gap: 6px; margin-top: 32px; flex-wrap: nowrap;
+    width: 100%; max-width: 520px; opacity: 0; justify-content: space-between;
+    animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+}
+.w-ex {
+    display: flex; align-items: center; gap: 0;
+    cursor: pointer; padding: 8px 18px; border-radius: 6px;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    background: var(--bg-panel); border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}
+.w-ex:hover {
+    border-color: var(--accent); background: var(--accent-light);
+}
+.w-ex:active { opacity: 0.8; }
+.w-ex:hover .w-ex-label { color: var(--accent); }
+.w-ex-label {
+    font-size: 15px; color: var(--text-2); font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    text-align: center; line-height: 1.2;
+    transition: color 0.25s;
+    white-space: nowrap;
+}
+
+@keyframes w-slide-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-placeholder {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.5; }
+}
+
+/* ====== SCENE EDITOR ====== */
+#editor-toolbar {
+    position: absolute; top: 8px; left: 8px; z-index: 15;
+    display: none; gap: 4px; align-items: center;
+}
+#editor-toolbar.visible { display: flex; }
+.ed-btn {
+    height: 32px; padding: 0 10px; background: rgba(248,250,238,0.9);
+    border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-2); cursor: pointer; font-size: 11px;
+    font-family: 'DM Sans', sans-serif; font-weight: 500;
+    display: flex; align-items: center; gap: 5px;
+    backdrop-filter: blur(8px); transition: all 0.15s;
+}
+.ed-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ed-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ed-btn svg { width: 14px; height: 14px; }
+#model-picker {
+    position: absolute; top: 52px; left: 0; bottom: 0; z-index: 16;
+    background: var(--bg-panel); border-right: 1px solid var(--border);
+    padding: 12px; box-shadow: 2px 0 12px rgba(70,90,30,0.08);
+    backdrop-filter: var(--glass-blur);
+    display: none; width: 260px;
+    flex-direction: column; overflow: hidden;
+}
+#model-picker.visible { display: flex; }
+#mp-header {
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--text-2); letter-spacing: 1px; text-transform: uppercase;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+}
+#mp-close {
+    background: none; border: none; cursor: pointer; color: var(--text-3);
+    font-size: 16px; padding: 0 4px; transition: color 0.2s;
+}
+#mp-close:hover { color: var(--text); }
+#mp-create-input {
+    width: 100%; padding: 10px 12px; margin-bottom: 8px;
+    border: 1.5px dashed var(--border); border-radius: 8px;
+    background: var(--bg-input); font-size: 12px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; outline: none;
+}
+#mp-create-input:focus { border-color: var(--accent); border-style: solid; }
+#mp-create-input::placeholder { color: var(--text-3); }
+#mp-create-status {
+    padding: 6px 10px; font-size: 10px; color: var(--accent);
+    display: none;
+}
+#mp-grid {
+    flex: 1; overflow-y: auto; display: grid;
+    grid-template-columns: 1fr 1fr; gap: 6px;
+    align-content: start;
+}
+#mp-grid::-webkit-scrollbar { width: 4px; }
+#mp-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.mp-item {
+    padding: 8px; border-radius: 8px; cursor: pointer;
+    font-size: 10px; color: var(--text-2); transition: all 0.15s;
+    text-transform: capitalize; border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: var(--bg-input);
+}
+.mp-item:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.mp-thumb {
+    width: 48px; height: 48px; border-radius: 6px; object-fit: cover;
+    background: var(--bg-panel); flex-shrink: 0;
+}
+.mp-icon {
+    width: 48px; height: 48px; border-radius: 6px;
+    background: var(--bg-panel); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: var(--text-3);
+}
+#editor-info {
+    position: absolute; bottom: 68px; left: 50%; transform: translateX(-50%);
+    z-index: 15; padding: 6px 14px; border-radius: 8px;
+    background: rgba(0,0,0,0.7); color: #fff; font-size: 11px;
+    font-family: 'DM Sans', sans-serif;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+#editor-info.visible { opacity: 1; }
+.recording-badge {
+    position: absolute; top: 12px; right: 12px; z-index: 30;
+    background: #dc2626; color: #fff; padding: 6px 14px; border-radius: 20px;
+    font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 600;
+    display: none; align-items: center; gap: 6px;
+    animation: rec-pulse 1s infinite;
+}
+.recording-badge.visible { display: flex; }
+@keyframes rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+.topbar-btn {
+    padding: 5px 12px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-2); font-family: 'DM Sans', sans-serif;
+    font-size: 11px; cursor: pointer; transition: all 0.2s; font-weight: 500;
+    display: flex; align-items: center; gap: 5px;
+}
+.topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.topbar-btn svg { width: 12px; height: 12px; }
+/* Clear Scene waiting for its confirming second click (see clearSceneBtn). */
+.topbar-btn.armed, .topbar-btn.armed:hover { background: var(--error); border-color: var(--error); color: #fff; }
+
+/* Render mode crosshair overlay */
+#render-overlay {
+    position: absolute; inset: 0; z-index: 20; cursor: crosshair; display: none;
+}
+#render-overlay.active { display: block; }
+#render-dot {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    background: #22c55e; border: 2px solid #fff;
+    box-shadow: 0 0 12px rgba(34,197,94,0.5); pointer-events: none;
+    transform: translate(-50%, -50%); display: none;
+}
+#render-hint {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 8px 18px; border-radius: 20px; background: rgba(0,0,0,0.75);
+    color: #fff; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    backdrop-filter: blur(8px); white-space: nowrap;
+}
+#render-progress {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    padding: 16px 28px; border-radius: 12px; background: rgba(0,0,0,0.8);
+    color: #fff; font-size: 14px; font-family: 'DM Sans', sans-serif;
+    backdrop-filter: blur(12px); display: none; text-align: center;
+}
+#render-progress .render-bar {
+    width: 200px; height: 4px; background: rgba(255,255,255,0.2);
+    border-radius: 2px; margin-top: 10px; overflow: hidden;
+}
+#render-progress .render-fill {
+    height: 100%; background: #22c55e; border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+/* ===================== Mode toggle ===================== */
+#mode-toggle {
+    display: flex; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px; gap: 2px;
+}
+.mode-btn {
+    padding: 6px 16px; border: none; background: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--text-3); border-radius: 16px; transition: all 0.2s;
+}
+.mode-btn:hover { color: var(--text-2); }
+.mode-btn.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+
+/* Character toggle (Chat only) — same segmented shape as the mode toggle */
+#avatar-toggle {
+    display: flex; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px; gap: 2px;
+}
+.avatar-btn {
+    padding: 5px 12px; border: none; background: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+    color: var(--text-3); border-radius: 16px; transition: all 0.2s;
+}
+.avatar-btn:hover:not(:disabled) { color: var(--text-2); }
+.avatar-btn.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+.avatar-btn:disabled { opacity: 0.5; cursor: wait; }
+
+#auth-btn {
+    padding: 6px 14px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-2); font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+}
+#auth-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Topbar controls hold their size: without this they are the flex items that
+   give way first, so labels wrapped and the pills squashed before the bar's
+   min-width ever came into play. */
+#mode-toggle, #avatar-toggle, #auth-btn, .topbar-btn, #path-toggle {
+    flex-shrink: 0; white-space: nowrap;
+}
+
+/* ===================== Mode-scoped visibility ===================== */
+body[data-mode="create"] .help-only { display: none !important; }
+body[data-mode="help"] .create-only { display: none !important; }
+
+/* Chat is a conversation, so there the panel is the main surface rather than a
+   sidebar; Create keeps the narrow rail so the stage stays large. The
+   :not(.collapsed) matters — this selector outranks #panel.collapsed, so
+   without it the collapse toggle would stop working in Chat. */
+body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
+
+/* ===================== Help mode: welcome ===================== */
+/* Transparent overlay so the persona reads clearly behind it — just the
+   quick-start buttons before a conversation starts. Text and the real input
+   live in the left panel now (see "Help mode: chat input" below), so the
+   viewport is never competing with itself for attention. */
+#help-welcome {
+    position: absolute; inset: 0; z-index: 100;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 28px; pointer-events: none;
+}
+#help-welcome .w-examples { pointer-events: auto; justify-content: center; flex-wrap: wrap; }
+
+/* Floating replay control for the last demo — a small icon button rather
+   than a text row, since the viewport carries no text of its own. */
+#help-replay-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 20;
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-md); transition: transform 0.15s, background 0.15s;
+}
+#help-replay-btn:hover { background: var(--accent-hover); transform: scale(1.06); }
+#help-replay-btn svg { margin-left: 2px; } /* optical centering for the play triangle */
+
+/* ===================== Help mode: chat input (left panel) ===================== */
+#help-input-wrap { padding: 10px 12px; border-top: 1px solid var(--border); position: relative; }
+#help-input {
+    width: 100%; height: 36px; padding: 0 38px 0 12px; box-sizing: border-box;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 12px;
+    font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color 0.2s;
+}
+#help-input:focus { border-color: var(--accent); }
+#help-input::placeholder { color: var(--text-3); }
+#help-input:disabled { opacity: 0.5; cursor: not-allowed; }
+#help-mic-btn {
+    position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    width: 24px; height: 24px; border-radius: 6px; border: none;
+    background: transparent; cursor: pointer; font-size: 13px;
+    opacity: 0.55;
+}
+#help-mic-btn:hover { opacity: 1; }
+
+/* ===================== Create mode: empty-scene examples ===================== */
+#create-welcome {
+    position: absolute; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+/* The title and the line about how it works live here, over the empty stage,
+   rather than as log lines in the panel — they're an introduction, and the
+   panel is for what the app is actually doing. Hidden as soon as a scene
+   exists (see create-welcome's display toggles). */
+#create-intro {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    width: 100%; max-width: 620px;
+    /* Lifted off the centre so the wording sits in the sky rather than across
+       the horizon, where the grass ran straight through the letters. */
+    transform: translateY(-15vh);
+}
+/* Dark ink rather than accent green: this sits over a bright grass render, and
+   the palette's own --text carries the contrast on its own. An earlier glow
+   gave it the legibility but read as blur, so there's no shadow here at all. */
+.w-title {
+    font-family: 'DM Mono', monospace; font-size: 30px; font-weight: 600;
+    letter-spacing: 4px; color: var(--text);
+    opacity: 0; animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+.w-subtitle {
+    margin-top: 10px; font-size: 14px; color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    opacity: 0; animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+}
+/* The cards are a sibling of the lifted text, not a child of it: a transform
+   doesn't move layout, so they keep their place near the middle while the
+   wording rides up into the sky, and their spacing stays in px rather than
+   needing a huge vh margin to undo the lift. */
+#create-welcome .w-examples { justify-content: center; flex-wrap: wrap; max-width: 620px; margin-top: 160px; }
+
+/* ===================== Help mode: chat log (left panel) ===================== */
+#chat-tab-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+#help-chat-log {
+    flex: 1; height: 100%; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+/* The empty state. margin:auto centres it in the log's flex column, so it
+   needs no absolute positioning and never overlaps the input row. */
+#help-greeting {
+    margin: auto; text-align: center; padding: 0 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 26px; font-weight: 500;
+    line-height: 1.35; color: var(--text-3);
+}
+.help-bubble {
+    padding: 9px 13px; border-radius: 12px; font-size: 12.5px; line-height: 1.45;
+    font-family: 'DM Sans', sans-serif; max-width: 92%;
+}
+.help-user {
+    align-self: flex-end; background: var(--accent); color: #fff;
+    border-bottom-right-radius: 3px;
+}
+.help-assistant {
+    align-self: flex-start; background: var(--bg-input); color: var(--text);
+    border-bottom-left-radius: 3px;
+}
+
+/* ===================== Help mode: learned skills (left panel) ===================== */
+#learned-tab-content { flex: 1; overflow: hidden; flex-direction: column; }
+#learned-hint {
+    padding: 10px 14px; font-size: 11px; color: var(--text-3);
+    border-bottom: 1px solid var(--border); font-family: 'DM Sans', sans-serif;
+}
+#learned-list { flex: 1; overflow-y: auto; padding: 6px 10px; }
+.learned-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: var(--text);
+    transition: background 0.15s;
+}
+.learned-row:hover { background: var(--bg-input); }
+.learned-skill { text-transform: capitalize; }
+.learned-count { font-size: 10px; color: var(--text-3); font-family: 'DM Mono', monospace; }
+.learned-empty { padding: 20px 12px; font-size: 12px; color: var(--text-3); text-align: center; }
+
+/* ===================== Create mode: reference library (left panel) ===================== */
+#lib-references { border-bottom: 1px solid var(--border); }
+#lib-references-header {
+    padding: 10px 14px 4px; font-family: 'DM Mono', monospace; font-size: 11px;
+    font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-2);
+}
+#lib-references-hint {
+    font-family: 'DM Sans', sans-serif; text-transform: none; font-weight: 400;
+    font-size: 10px; color: var(--text-3); letter-spacing: 0; margin-left: 6px;
+}
+#lib-references-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    padding: 8px 14px; max-height: 160px; overflow-y: auto;
+}
+.ref-card {
+    position: relative; border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; background: var(--bg-input); min-height: 44px;
+}
+.ref-card img { width: 100%; height: 60px; object-fit: cover; display: block; }
+.ref-note {
+    padding: 8px; font-size: 10.5px; color: var(--text-2); line-height: 1.3;
+    font-family: 'DM Sans', sans-serif;
+}
+.ref-remove {
+    position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+    border-radius: 50%; border: none; background: rgba(0,0,0,0.45); color: #fff;
+    font-size: 11px; line-height: 1; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+}
+#lib-add-reference-wrap { display: flex; gap: 6px; padding: 0 14px 12px; }
+#lib-add-reference-input {
+    flex: 1; padding: 8px 10px; border: 1.5px dashed var(--border); border-radius: 6px;
+    background: var(--bg-input); font-size: 11px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; outline: none;
+}
+#lib-add-reference-input:focus { border-color: var(--accent); border-style: solid; }
+#lib-add-reference-btn {
+    padding: 8px 12px; border: none; border-radius: 6px; background: var(--accent);
+    color: #fff; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+#lib-add-reference-btn:hover { background: var(--accent-hover); }
