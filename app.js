@@ -6290,14 +6290,18 @@ if (document.getElementById('ed-save')) document.getElementById('ed-save').addEv
 
 
 // ========================================================================
-// AUTH0 (stub) — sign-in gate so Backboard memory can be scoped per user.
-// Swap the body of signIn()/getUserId() for the real Auth0 SPA SDK once
-// AUTH0_DOMAIN / AUTH0_CLIENT_ID are set. Until then this fakes a stable
-// per-browser user id so the memory features below are demoable today.
+// AUTH (local) — username and password sign-in kept in this browser's
+// localStorage, enough to put a name on the app until Auth0 is wired up.
+// Passwords are stored as salted SHA-256 hashes rather than plain text, but
+// with no server to check against, none of this is real security.
+// getUserId below is unchanged: it's the per-browser id Backboard memory uses.
 // ========================================================================
-const AUTH0_DOMAIN = ''; // e.g. 'your-tenant.us.auth0.com'
-const AUTH0_CLIENT_ID = '';
 const authBtn = document.getElementById('auth-btn');
+const authScreen = document.getElementById('auth-screen');
+const authForm = document.getElementById('auth-form');
+const authError = document.getElementById('auth-error');
+const AUTH_USERS_KEY = 'animo_users';     // { lowercased username: { name, hash } }
+const AUTH_SESSION_KEY = 'animo_session'; // the signed-in username, as they typed it
 
 function getUserId() {
     let uid = localStorage.getItem('animo_user_id');
@@ -6308,38 +6312,68 @@ function getUserId() {
     return uid;
 }
 
+function currentUser() {
+    return localStorage.getItem(AUTH_SESSION_KEY) || '';
+}
+
 function isSignedIn() {
-    return !!localStorage.getItem('animo_signed_in');
+    return !!currentUser();
+}
+
+async function hashPassword(username, password) {
+    const bytes = new TextEncoder().encode(`animo:${username.toLowerCase()}:${password}`);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function updateAuthBtn() {
-    if (isSignedIn()) {
-        authBtn.textContent = getUserId().replace('guest-', '');
-        authBtn.title = 'Signed in — click to sign out';
-    } else {
-        authBtn.textContent = 'Sign in';
-        authBtn.title = 'Sign in';
-    }
+    authBtn.textContent = isSignedIn() ? currentUser() : 'Sign in';
+    authBtn.title = isSignedIn() ? 'Signed in — click to sign out' : 'Sign in';
 }
 
-authBtn.addEventListener('click', () => {
-    if (!AUTH0_DOMAIN || !AUTH0_CLIENT_ID) {
-        // TODO: replace with real Auth0 SPA SDK (createAuth0Client, loginWithRedirect)
-        if (isSignedIn()) {
-            localStorage.removeItem('animo_signed_in');
-            log('Signed out', 'system');
-        } else {
-            localStorage.setItem('animo_signed_in', '1');
-            log(`Signed in as ${getUserId()} (Auth0 not configured — using a local guest id)`, 'system');
-        }
-        updateAuthBtn();
-        renderLearnedList();
-        renderReferenceLibrary();
+function showAuthScreen(show) {
+    authScreen.style.display = show ? 'flex' : 'none';
+    if (!show) return;
+    authForm.reset();
+    authError.textContent = '';
+    document.getElementById('auth-username').focus();
+}
+
+// One form, two buttons: Enter signs in, Sign up creates the account first.
+authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const signingUp = e.submitter?.dataset.action === 'signup';
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    if (!username || !password) { authError.textContent = 'Enter a username and a password.'; return; }
+
+    const users = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '{}');
+    const key = username.toLowerCase();
+    const hash = await hashPassword(username, password);
+    if (signingUp) {
+        if (users[key]) { authError.textContent = 'That username is taken. Sign in instead.'; return; }
+        users[key] = { name: username, hash };
+        localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+    } else if (!users[key] || users[key].hash !== hash) {
+        authError.textContent = 'Wrong username or password.';
         return;
     }
-    // Real Auth0 flow goes here once configured.
+
+    localStorage.setItem(AUTH_SESSION_KEY, users[key].name);
+    showAuthScreen(false);
+    updateAuthBtn();
+    setMode('help'); // every sign-in lands on Chat
+    syncChatGreeting();
+});
+
+// Signed in, the topbar button shows who you are and signs you out.
+authBtn.addEventListener('click', () => {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    updateAuthBtn();
+    showAuthScreen(true);
 });
 updateAuthBtn();
+showAuthScreen(!isSignedIn());
 
 // ========================================================================
 // BACKBOARD (persistent memory) — thin client with a localStorage fallback
@@ -6733,14 +6767,11 @@ function speak(text, onEnd, onStart) {
     });
 }
 
-// Whose chat this is. ANIMO_USER_NAME (local-config.js) when set, else the
-// signed-in id, else nobody in particular — the greeting drops the name
-// rather than saying hello to "guest-4f2c1a".
+// Whose chat this is: the signed-in username, else ANIMO_USER_NAME
+// (local-config.js), else nobody in particular — the greeting drops the name.
 function displayName() {
-    const configured = (window.ANIMO_USER_NAME || '').trim();
-    if (configured) return configured;
-    if (isSignedIn()) return getUserId().replace('guest-', '');
-    return '';
+    if (isSignedIn()) return currentUser();
+    return (window.ANIMO_USER_NAME || '').trim();
 }
 
 // Bubbles are what counts as history — the greeting is a child of the log too,

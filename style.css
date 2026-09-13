@@ -500,6 +500,38 @@ body {
 }
 #auth-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ===================== Sign in / sign up ===================== */
+/* Covers the whole app, on its own background, until someone signs in. */
+#auth-screen {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, #f4f8e8 0%, #eaf2d8 45%, #dfeec8 100%);
+}
+#auth-card { display: flex; flex-direction: column; align-items: center; text-align: center; width: 320px; }
+#auth-form {
+    width: 100%; margin-top: 36px; display: flex; flex-direction: column; gap: 10px;
+    opacity: 0; animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+}
+#auth-form input {
+    width: 100%; height: 40px; padding: 0 12px;
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color 0.2s;
+}
+#auth-form input:focus { border-color: var(--accent); }
+#auth-form input::placeholder { color: var(--text-3); }
+#auth-error { min-height: 16px; font-size: 12px; color: var(--error); font-family: 'DM Sans', sans-serif; }
+#auth-actions { display: flex; gap: 8px; }
+#auth-actions button {
+    flex: 1; height: 38px; border-radius: 8px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text-2);
+    transition: all 0.2s;
+}
+#auth-actions button:hover { border-color: var(--accent); color: var(--accent); }
+#auth-actions .auth-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#auth-actions .auth-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+
 /* Topbar controls hold their size: without this they are the flex items that
    give way first, so labels wrapped and the pills squashed before the bar's
    min-width ever came into play. */

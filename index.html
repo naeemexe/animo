@@ -10,6 +10,23 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-mode="help">
+    <div id="auth-screen">
+        <div id="auth-card">
+            <h2 class="w-title">Animo 1.0</h2>
+            <p class="w-subtitle">Build a scene, one instruction at a time</p>
+            <form id="auth-form">
+                <input type="text" id="auth-username" placeholder="Username" autocomplete="username" autocapitalize="off" spellcheck="false">
+                <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+                <div id="auth-error"></div>
+                <div id="auth-actions">
+                    <button type="submit" class="auth-primary" data-action="signin">Sign in</button>
+                    <button type="submit" data-action="signup">Sign up</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Already signed in: skip the sign-in page before app.js (slow to load) gets the chance to. -->
+    <script>if (localStorage.getItem('animo_session')) document.getElementById('auth-screen').style.display = 'none';</script>
     <div id="topbar">
         <h1 id="logo-btn" style="cursor:pointer" title="Return to home">ANIMO</h1>
         <div id="mode-toggle" role="tablist" aria-label="Mode">
