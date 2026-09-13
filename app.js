@@ -167,6 +167,7 @@ renderer.domElement.addEventListener('wheel', (e) => {
 }, { capture: true, passive: true });
 controls.target.set(0, 100, 0);
 controls.update();
+const HOME_VIEW = { position: camera.position.clone(), target: controls.target.clone() }; // where Clear Scene puts the camera back
 
 // Grid
 const grid = new THREE.GridHelper(500, 20, 0xc0c0b8, 0xccccc4);
@@ -620,7 +621,51 @@ async function avatarEntry(key) {
     // app's unit convention, per character — the two models aren't the same
     // height, and the skinning bakes this in.
     avatarCache[key] = { vrm, scale: CHAR_HEIGHT / Math.max(box.max.y - box.min.y, 0.01) };
+    applySkinTone(document.body.dataset.mode === 'create');
     return avatarCache[key];
+}
+
+// VRoid marks its two skin materials with a _SKIN suffix (Face and Body);
+// the mouth, brows and lashes are separate _FACE overlays and keep their own
+// colour, so tinting those would just muddy the makeup. The models ship pale:
+// under Chat's studio lights they read pink, and under Create's brighter,
+// graded look they wash out almost white. Hence a multiplier per look rather
+// than one flat colour.
+// Given as sRGB hex rather than bare floats: THREE.Color reads raw components
+// as linear-light, so an obvious-looking (0.95, 0.82, 0.70) encodes to #f9eada
+// — a 2% dip in red, 14% in blue — which on screen is still simply pink.
+// Multiplying two colours in linear space is the same as multiplying their
+// sRGB values, so a hex here means what it looks like: keep this much of each
+// channel of the texture, which averages a pale pink (219,178,167).
+const SKIN_TINT = {
+    chat: new THREE.Color('#e9deb7'),
+    create: new THREE.Color('#d9c99e'),
+};
+const isSkinMaterial = (m) => /_SKIN/i.test((m && m.name) || '');
+
+// Multiplied over the file's own factors, never assigned outright: the
+// original is stashed on first touch so switching modes back and forth
+// re-tints from the same base instead of compounding into mud.
+function applySkinTone(createLook) {
+    const tint = createLook ? SKIN_TINT.create : SKIN_TINT.chat;
+    for (const entry of Object.values(avatarCache)) {
+        entry?.vrm?.scene?.traverse(o => {
+            if (!o.material) return;
+            for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+                if (!isSkinMaterial(m)) continue;
+                if (!m.userData._skinBase) {
+                    m.userData._skinBase = {
+                        color: m.color?.clone(),
+                        shade: m.shadeColorFactor?.clone(), // MToon only
+                    };
+                }
+                const base = m.userData._skinBase;
+                if (base.color && m.color) m.color.copy(base.color).multiply(tint);
+                if (base.shade && m.shadeColorFactor) m.shadeColorFactor.copy(base.shade).multiply(tint);
+                m.needsUpdate = true;
+            }
+        });
+    }
 }
 
 // Load a character and anything it borrows, so createCharacter (which is
@@ -1033,6 +1078,15 @@ function playFrom(wallSeconds) {
     updateObjectAnimations(t);
 }
 
+// A timeline seek: the whole scene to `wallSeconds`, still playing or paused
+// as it was. Every clock moves together, so nobody is left out of step.
+function seekPlayback(wallSeconds) {
+    const wasPlaying = isPlaying && !playbackFinished;
+    playFrom(wallSeconds);
+    isPlaying = wasPlaying;
+    updatePlayPauseIcon();
+}
+
 // Interpolate every tracked object's position/rotation at time t (seconds)
 // along its authored path. Objects hold their final pose once t exceeds
 // their own path duration.
@@ -1391,6 +1445,10 @@ function recomputePlaybackDuration() {
 // notion of two people interacting, so they won't make literal contact;
 // they're positioned facing each other so it reads as a shared scene.
 // ========================================================================
+// Every Create character's mixer runs at this rate: playFrom, groundCharacter,
+// prependHoldToCharacter and the timeline all convert between clip time and
+// the shared wall clock with it, so a mixer left at any other rate plays out
+// of step with the rest of the cast.
 const CHAR_TIME_SCALE = 1.5;
 let characters = []; // [{ label, group, bones, bodyMeshesArr, mixer, action, clips, mergedClip, spawn }]
 
@@ -1659,6 +1717,7 @@ const BEAT_ENERGY_FLOOR = 0.12;  // fraction of peak movement that counts as mov
 const BEAT_SMOOTH_WINDOW = 0.25; // seconds; smooths out single-frame twitches
 const BEAT_MARGIN = 0.15;        // seconds of wind-up/follow-through to keep
 const MAX_BEAT_STRETCH = 1.8;    // never slow a motion down more than this
+const BEAT_SYNC_TOLERANCE = 0.05; // clip seconds people sharing a beat may be out of step before one waits
 
 // Where in the clip the body is actually moving. Rotation only — root travel
 // is handled separately, and a slide with a still body isn't an action.
@@ -4384,20 +4443,79 @@ input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
 });
 
-// The logo clears Create back to an empty stage, ready for a fresh first prompt
-// (it used to reopen the welcome screen, which no longer exists).
-document.getElementById('logo-btn').addEventListener('click', () => {
-    if (document.body.dataset.mode !== 'create') return;
+// Something is still generating or recording. It would land in a cleared stage
+// when it finished (a new person standing on nothing, or the whole scene back),
+// so a clear waits for it.
+function createBusy() {
+    return isGenerating || chatInput.disabled || isRecording;
+}
+
+// Clear Scene: Create back to how it opens — no cast, props, ground or beats,
+// an empty activity log, the camera home — ready for a fresh first prompt.
+// References in the Library stay; they're meant for the next scene too.
+function clearCreateScene() {
+    if (createBusy()) {
+        log('Wait for the current step to finish, then clear the scene', 'system');
+        return;
+    }
     clearAllCharacters();
     for (const obj of sceneObjects) scene.remove(obj);
     if (groundMesh) scene.remove(groundMesh);
     if (pathLine) { scene.remove(pathLine); pathLine = null; }
+    selectedObject = null; selectedType = null;
+    removeSelectionBox();
+    exitBuildMode();
+    modelPicker.classList.remove('visible');
     resetToBlankScene();
+    setCreateLook(true); // a modify_scene beat sets every ambient light, the stage's own included
     createSnapshot = null;
+    lastBvhText = null;
+    selectedClipIndex = -1;
+    renderTimelineClips();
+    edToolbar.classList.remove('visible');
+    const pathBtn = document.getElementById('path-toggle');
+    pathVisible = false;
+    pathBtn.style.display = 'none';
+    pathBtn.classList.remove('active');
+    pathBtn.textContent = 'Show Path';
+    grid.visible = true;
+    camera.position.copy(HOME_VIEW.position);
+    controls.target.copy(HOME_VIEW.target);
+    controls.update();
+    consoleEl.replaceChildren();
+    reportMotionBackend();
+    chatInput.value = '';
     chatInput.placeholder = 'Describe a scene, then build it up...';
-    document.getElementById('create-welcome').style.display = 'flex';
-    log('Cleared. Describe a scene to start again.', 'system');
+    updatePlayPauseIcon();
+    syncCreateWelcome();
     chatInput.focus();
+}
+
+// Two clicks when there's something to lose, since nothing brings a cleared
+// scene back: the first arms the button for a few seconds, the second clears.
+const clearSceneBtn = document.getElementById('clear-scene-btn');
+let clearSceneDisarm = null; // pending timeout while armed
+function disarmClearScene() {
+    clearTimeout(clearSceneDisarm);
+    clearSceneDisarm = null;
+    clearSceneBtn.classList.remove('armed');
+    clearSceneBtn.querySelector('span').textContent = 'Clear Scene';
+}
+clearSceneBtn.addEventListener('click', () => {
+    if (!clearSceneDisarm && createHasContent() && !createBusy()) {
+        clearSceneBtn.classList.add('armed');
+        clearSceneBtn.querySelector('span').textContent = 'Confirm clear';
+        clearSceneDisarm = setTimeout(disarmClearScene, 3000);
+        return;
+    }
+    disarmClearScene();
+    clearCreateScene();
+});
+
+// The logo does the same in Create, in one click as it always has (it used to
+// reopen the welcome screen, which no longer exists).
+document.getElementById('logo-btn').addEventListener('click', () => {
+    if (document.body.dataset.mode === 'create') clearCreateScene();
 });
 
 // Render loop
@@ -4459,24 +4577,38 @@ function animate() {
     if (skyGroup.visible) skyGroup.position.set(camera.position.x, 0, camera.position.z);
     renderFrame();
 }
-animate();// Initial welcome messages
-log('Animo v0.1', 'system');
+animate();
+
+// The title and the "one instruction at a time" line are the Create overlay
+// now (see #create-intro), so they aren't repeated in the activity panel.
 // Report whether a motion backend is actually reachable (scenes still build
-// without one, using the bundled sample motions).
-fetch(`${API}/health`, { signal: AbortSignal.timeout(4000) })
-    .then(r => (r.ok ? r.json() : Promise.reject()))
-    .then(h => log(`Motion backend ready${h.model ? ` (${h.model})` : ''}`, 'success'))
-    .catch(() => log('No motion backend reachable — sample motions will be used until one is running', 'system'));
-log('Describe a scene below to start, then build it up one instruction at a time', 'system');
+// without one, using the bundled sample motions). Clearing the scene empties
+// the log, so it reports again then.
+function reportMotionBackend() {
+    fetch(`${API}/health`, { signal: AbortSignal.timeout(4000) })
+        .then(r => (r.ok ? r.json() : Promise.reject()))
+        .then(h => log(`Motion backend ready${h.model ? ` (${h.model})` : ''}`, 'success'))
+        .catch(() => log('No motion backend reachable — sample motions will be used until one is running', 'system'));
+}
+reportMotionBackend();
 
 
-// Resize
-window.addEventListener('resize', () => {
-    camera.aspect = viewport.clientWidth / viewport.clientHeight;
+// Resize. Follows the viewport's own box rather than the window: switching
+// modes changes the panel's width (half the window in Chat, a rail in Create),
+// and so does collapsing it, without the window resizing at all. On the window
+// event alone the canvas kept its old drawing size and CSS stretched it to the
+// new box — the sideways-stretched render on coming back to Chat.
+new ResizeObserver(() => {
+    const w = viewport.clientWidth, h = viewport.clientHeight;
+    if (!w || !h) return;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-    composer.setSize(viewport.clientWidth, viewport.clientHeight);
-});
+    renderer.setSize(w, h);
+    composer.setSize(w, h);
+    // Resizing clears the canvas, and observers run after the frame's own
+    // render — draw again now, or a panel slide flickers blank every frame.
+    renderFrame();
+}).observe(viewport);
 
 // ========== TIMELINE & INTERACTION SYSTEM ==========
 const raycaster = new THREE.Raycaster();
@@ -4629,11 +4761,12 @@ function renderTimelineClips() {
                     selectedClipIndex = (selectedClipIndex === clipIdx) ? -1 : clipIdx;
                     renderTimelineClips();
                 }
-                // Seek that character to the start of this beat
+                // Seek the whole scene to the start of this beat. Seeking only
+                // this character left the rest of the cast where they were, out
+                // of step from then on. Beat durations are in clip time.
                 let t = 0;
                 for (let j = 0; j < clipIdx; j++) t += entry.clips[j].duration;
-                entry.mixer.setTime(t);
-                updateBodyMeshesIn(entry.bodyMeshesArr);
+                seekPlayback(t / CHAR_TIME_SCALE);
             });
 
             const removeBtn = el.querySelector('.clip-remove');
@@ -4712,7 +4845,7 @@ function finishTimelineEdit() {
         createSceneStarted = false;
         renderTimelineClips();
         document.getElementById('timeline-bar')?.classList.remove('visible');
-        document.getElementById('create-welcome').style.display = 'flex';
+        syncCreateWelcome();
         updatePlayPauseIcon();
         return;
     }
@@ -5215,16 +5348,34 @@ async function handleAddMotion(params, actionId = nextActionLogId()) {
         // them to face where the others actually are, and cap how far the
         // beat can carry them so they stay within arm's reach of each other.
         const endPoints = requests.map(r => characterEndState(r.entry).point);
+
+        // Strip Kimodo's dead padding and fill the beat with the action.
+        const newClips = requests.map((r, i) => fillBeat((targetAngle !== null)
+            ? rotateBVHToward(bvhs[i], targetAngle).clip
+            : new BVHLoader().parse(bvhs[i]).clip, dur));
+
+        // A shared beat is one moment in the story, so it starts and ends at
+        // the same time for everyone in it. It goes on the end of each
+        // person's own timeline, and those needn't line up (someone joined
+        // later, or had a beat the others didn't), which played the "same"
+        // fight seconds apart; fillBeat can also leave the clips a little
+        // different in length. Whoever would be early holds their pose.
+        const beatStart = Math.max(...requests.map(r => r.entry.mergedClip.duration));
+        if (interaction) {
+            const beatLength = Math.max(...newClips.map(c => c.duration));
+            requests.forEach((r, i) => {
+                const lag = beatStart - r.entry.mergedClip.duration;
+                if (lag > BEAT_SYNC_TOLERANCE) appendMotionToCharacter(r.entry, holdEndPoseClip(r.entry.mergedClip, lag), '(waiting)');
+                const shortfall = beatLength - newClips[i].duration;
+                if (shortfall > BEAT_SYNC_TOLERANCE) newClips[i] = mergeClips(newClips[i], holdEndPoseClip(newClips[i], shortfall), 0.15);
+            });
+        }
         // Where the new beat begins on the shared clock (a moment before, as
         // a lead-in) — playback jumps there once it's appended.
-        const beatStartWall = Math.min(...requests.map(r => r.entry.mergedClip.duration)) / CHAR_TIME_SCALE - 0.25;
+        const beatStartWall = beatStart / CHAR_TIME_SCALE - 0.25;
 
         requests.forEach((r, i) => {
-            const raw = (targetAngle !== null)
-                ? rotateBVHToward(bvhs[i], targetAngle).clip
-                : new BVHLoader().parse(bvhs[i]).clip;
-            // Strip Kimodo's dead padding and fill the beat with the action.
-            const newClip = fillBeat(raw, dur);
+            const newClip = newClips[i];
 
             // Every fresh Kimodo generation is baked facing its own arbitrary
             // "forward" — with no correction a new beat visibly snapped back
@@ -5968,7 +6119,7 @@ renderBtn.addEventListener('click', async () => {
             if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; }
 
             renderProgress.style.display = 'none';
-            log('Render complete', 'success', 'render-status');
+            log('Export complete', 'success', 'render-status');
         }
     }
     requestAnimationFrame(orbitFrame);
@@ -6528,12 +6679,38 @@ function speak(text, onEnd, onStart) {
     });
 }
 
+// Whose chat this is. ANIMO_USER_NAME (local-config.js) when set, else the
+// signed-in id, else nobody in particular — the greeting drops the name
+// rather than saying hello to "guest-4f2c1a".
+function displayName() {
+    const configured = (window.ANIMO_USER_NAME || '').trim();
+    if (configured) return configured;
+    if (isSignedIn()) return getUserId().replace('guest-', '');
+    return '';
+}
+
+// Bubbles are what counts as history — the greeting is a child of the log too,
+// so a plain children.length would always look like a started conversation.
+function chatHasHistory() {
+    return document.querySelectorAll('#help-chat-log .help-bubble').length > 0;
+}
+
+// Chat opens on a greeting rather than a blank panel.
+function syncChatGreeting() {
+    const el = document.getElementById('help-greeting');
+    if (!el) return;
+    const name = displayName();
+    el.textContent = name ? `Hi ${name}, let's get into it` : `Hi, let's get into it`;
+    el.style.display = chatHasHistory() ? 'none' : 'block';
+}
+
 function addHelpBubble(role, text) {
     const log_el = document.getElementById('help-chat-log');
     const bubble = document.createElement('div');
     bubble.className = `help-bubble help-${role}`;
     bubble.textContent = text;
     log_el.appendChild(bubble);
+    syncChatGreeting(); // first bubble retires the empty state
     log_el.scrollTop = log_el.scrollHeight;
 }
 
@@ -6804,9 +6981,6 @@ async function askHelp(question) {
 helpInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { const v = helpInput.value.trim(); if (v) { helpInput.value = ''; askHelp(v); } }
 });
-document.querySelectorAll('#help-welcome .w-ex').forEach(card => {
-    card.addEventListener('click', () => askHelp(card.dataset.prompt));
-});
 document.querySelectorAll('#create-welcome .w-ex').forEach(card => {
     card.addEventListener('click', () => handleChat(card.dataset.prompt));
 });
@@ -6886,6 +7060,22 @@ function restoreSceneVars(snap) {
     updatePlayPauseIcon();
 }
 
+// Whether Create has anything on stage. The timeline alone is the wrong test:
+// removing the last clip leaves every prop standing (see finishTimelineEdit),
+// and a stage full of props is still a scene — showing "Animo 1.0" over it was
+// the bug. Ground counts too, since a built scene always has one.
+function createHasContent() {
+    return timelineClips.length > 0 || sceneObjects.length > 0
+        || characters.length > 0 || !!groundMesh;
+}
+
+// The welcome overlay is purely an empty-state; every site that used to set
+// its display by hand now goes through here so they cannot disagree.
+function syncCreateWelcome() {
+    const el = document.getElementById('create-welcome');
+    if (el) el.style.display = createHasContent() ? 'none' : 'flex';
+}
+
 function resetToBlankScene() {
     sceneObjects = []; groundMesh = null; characterGroup = null; currentBones = null;
     bodyMeshes = []; helpDemoObject = null;
@@ -6907,6 +7097,11 @@ function resetToBlankScene() {
 function setMode(mode) {
     const leaving = document.body.dataset.mode;
     if (leaving === mode) return;
+
+    // Snap the panel to the new mode's width instead of sliding it there: the
+    // slide swept the whole layout sideways every time you switched tabs.
+    const panel = document.getElementById('panel');
+    panel.classList.add('instant');
 
     // Snapshot + hide (not remove — cheap to bring back) whichever mode we're leaving.
     if (leaving === 'create') {
@@ -6931,8 +7126,18 @@ function setMode(mode) {
         resetToBlankScene();
     }
 
+    enterMode(mode);
+    void panel.offsetWidth; // lay out the new width while transitions are still off
+    panel.classList.remove('instant');
+}
+
+// The per-mode entry work, split out of setMode because startup needs it too:
+// <body> already carries the opening mode, so setMode would early-return
+// before ever reaching this.
+function enterMode(mode) {
     if (mode === 'help') {
         setCreateLook(false);
+        applySkinTone(false);
         // Create's Library pane isn't mode-scoped, so one left open showed
         // through under Chat's own tabs — put Create's panel back first.
         switchTab('activity');
@@ -6951,8 +7156,9 @@ function setMode(mode) {
         } else {
             showChatPersona({ greet: true });
         }
-        const started = document.getElementById('help-chat-log').children.length > 0;
+        const started = chatHasHistory();
         document.getElementById('help-welcome').style.display = started ? 'none' : 'flex';
+        syncChatGreeting();
         // Arriving always lands on the greeting persona, so there's no demo
         // left to replay — a stale Replay button here would restart her loop.
         document.getElementById('help-replay-btn').style.display = 'none';
@@ -6961,13 +7167,13 @@ function setMode(mode) {
         stopSpeaking();
     } else {
         setCreateLook(true);
+        applySkinTone(true);
         grid.visible = !groundMesh; // Create mode: grid only shows before its own ground is built
-        if (mixer) mixer.timeScale = 1;
         // The panel's chat bar is Create's only input now, so it can't start collapsed.
         document.getElementById('panel').classList.remove('collapsed');
         document.getElementById('panel-reopen').classList.remove('visible');
         switchTab('activity');
-        document.getElementById('create-welcome').style.display = timelineClips.length > 0 ? 'none' : 'flex';
+        syncCreateWelcome();
     }
 }
 for (const b of document.querySelectorAll('.avatar-btn')) {
@@ -6979,3 +7185,8 @@ modeCreateBtn.addEventListener('click', () => setMode('create'));
 // Initial paint
 renderReferenceLibrary();
 renderLearnedList();
+
+// Open on Chat rather than an empty Create stage: the persona is already
+// standing there and waves, so there's something on screen before you've
+// typed anything.
+enterMode('help');

@@ -9,11 +9,18 @@
     --shadow-md: 0 4px 16px rgba(70,90,30,0.1);
     --shadow-lg: 0 8px 30px rgba(70,90,30,0.14);
     --radius: 8px;
+    /* The width below which the layout stops shrinking and scrolls instead.
+       Roughly panel (360) + a usable 3D viewport, with room for the topbar's
+       centred title to clear the buttons on both sides. */
+    --app-min: 860px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     background: linear-gradient(160deg, #f4f8e8 0%, #eaf2d8 45%, #dfeec8 100%) fixed;
-    color: var(--text); font-family: 'DM Sans', sans-serif; height: 100vh; overflow: hidden;
+    color: var(--text); font-family: 'DM Sans', sans-serif; height: 100vh;
+    /* Sideways scroll below --app-min rather than letting components overlap:
+       vertical stays hidden so the app itself never gains a page scrollbar. */
+    overflow-y: hidden; overflow-x: auto;
 }
 
 /* Top bar */
@@ -21,10 +28,18 @@ body {
     height: 52px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
     display: flex; align-items: center; padding: 0 24px; gap: 16px;
     box-shadow: var(--shadow-sm); backdrop-filter: var(--glass-blur);
+    position: relative; min-width: var(--app-min);
 }
+/* Centred on the window rather than sitting at the left edge. Absolute so it
+   centres on the bar itself and not on whatever space the flex row has left
+   over, which would drift as buttons show and hide per mode. Being out of the
+   flex flow, it cannot push the buttons aside — the bar's min-width is what
+   guarantees they never reach it. */
 #topbar h1 {
     font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 600;
     color: var(--accent); letter-spacing: 3px;
+    position: absolute; left: 50%; transform: translateX(-50%);
+    margin: 0; white-space: nowrap;
 }
 .status-pill {
     font-size: 10px; padding: 4px 12px; border-radius: 20px;
@@ -38,10 +53,10 @@ body {
 }
 
 /* Main layout */
-#main { display: flex; height: calc(100vh - 52px); }
+#main { display: flex; height: calc(100vh - 52px); min-width: var(--app-min); }
 
 /* 3D viewport */
-#viewport { flex: 1; position: relative; background: var(--bg); }
+#viewport { flex: 1; position: relative; background: var(--bg); min-width: 420px; }
 #viewport canvas { width: 100% !important; height: 100% !important; }
 #gen-info {
     position: absolute; top: 16px; left: 16px;
@@ -55,6 +70,8 @@ body {
 #panel {
     width: 360px; background: var(--bg-panel); border-right: 1px solid var(--border);
     display: flex; flex-direction: column; box-shadow: 2px 0 12px rgba(70,90,30,0.06);
+    /* Width, not flex-basis: #panel.collapsed sets width:0 to slide it away. */
+    flex-shrink: 0;
     backdrop-filter: var(--glass-blur);
     order: -1;
 }
@@ -235,6 +252,10 @@ body {
 
 #panel { transition: width 0.3s ease, opacity 0.3s ease; }
 #panel.collapsed { width: 0; min-width: 0; overflow: hidden; border: none; opacity: 0; }
+/* The slide above is for collapse/reopen. A mode switch also changes the
+   panel's width (half the window in Chat, a rail in Create), and that one is
+   applied at once — see setMode. */
+#panel.instant { transition: none; }
 #panel-reopen {
     position: absolute; top: 8px; left: 8px; z-index: 15;
     width: 28px; height: 28px; border-radius: 6px;
@@ -409,6 +430,8 @@ body {
 .topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
 .topbar-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .topbar-btn svg { width: 12px; height: 12px; }
+/* Clear Scene waiting for its confirming second click (see clearSceneBtn). */
+.topbar-btn.armed, .topbar-btn.armed:hover { background: var(--error); border-color: var(--error); color: #fff; }
 
 /* Render mode crosshair overlay */
 #render-overlay {
@@ -476,9 +499,22 @@ body {
 }
 #auth-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Topbar controls hold their size: without this they are the flex items that
+   give way first, so labels wrapped and the pills squashed before the bar's
+   min-width ever came into play. */
+#mode-toggle, #avatar-toggle, #auth-btn, .topbar-btn, #path-toggle {
+    flex-shrink: 0; white-space: nowrap;
+}
+
 /* ===================== Mode-scoped visibility ===================== */
 body[data-mode="create"] .help-only { display: none !important; }
 body[data-mode="help"] .create-only { display: none !important; }
+
+/* Chat is a conversation, so there the panel is the main surface rather than a
+   sidebar; Create keeps the narrow rail so the stage stays large. The
+   :not(.collapsed) matters — this selector outranks #panel.collapsed, so
+   without it the collapse toggle would stop working in Chat. */
+body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
 
 /* ===================== Help mode: welcome ===================== */
 /* Transparent overlay so the persona reads clearly behind it — just the
@@ -527,15 +563,50 @@ body[data-mode="help"] .create-only { display: none !important; }
 /* ===================== Create mode: empty-scene examples ===================== */
 #create-welcome {
     position: absolute; inset: 0; z-index: 100;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-#create-welcome .w-examples { justify-content: center; flex-wrap: wrap; max-width: 620px; }
+/* The title and the line about how it works live here, over the empty stage,
+   rather than as log lines in the panel — they're an introduction, and the
+   panel is for what the app is actually doing. Hidden as soon as a scene
+   exists (see create-welcome's display toggles). */
+#create-intro {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    width: 100%; max-width: 620px;
+    /* Lifted off the centre so the wording sits in the sky rather than across
+       the horizon, where the grass ran straight through the letters. */
+    transform: translateY(-15vh);
+}
+/* Dark ink rather than accent green: this sits over a bright grass render, and
+   the palette's own --text carries the contrast on its own. An earlier glow
+   gave it the legibility but read as blur, so there's no shadow here at all. */
+.w-title {
+    font-family: 'DM Mono', monospace; font-size: 30px; font-weight: 600;
+    letter-spacing: 4px; color: var(--text);
+    opacity: 0; animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+.w-subtitle {
+    margin-top: 10px; font-size: 14px; color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    opacity: 0; animation: w-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+}
+/* The cards are a sibling of the lifted text, not a child of it: a transform
+   doesn't move layout, so they keep their place near the middle while the
+   wording rides up into the sky, and their spacing stays in px rather than
+   needing a huge vh margin to undo the lift. */
+#create-welcome .w-examples { justify-content: center; flex-wrap: wrap; max-width: 620px; margin-top: 160px; }
 
 /* ===================== Help mode: chat log (left panel) ===================== */
 #chat-tab-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 #help-chat-log {
     flex: 1; height: 100%; overflow-y: auto; padding: 12px;
     display: flex; flex-direction: column; gap: 8px;
+}
+/* The empty state. margin:auto centres it in the log's flex column, so it
+   needs no absolute positioning and never overlaps the input row. */
+#help-greeting {
+    margin: auto; text-align: center; padding: 0 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 26px; font-weight: 500;
+    line-height: 1.35; color: var(--text-3);
 }
 .help-bubble {
     padding: 9px 13px; border-radius: 12px; font-size: 12.5px; line-height: 1.45;
