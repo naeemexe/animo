@@ -6528,9 +6528,9 @@ RULES:
 - demo_type "object_path": the question is about something an OBJECT/VEHICLE/MACHINE does, not the human body (parallel parking, how a car does a 3-point turn, a garage door opening, a ball rolling downhill). Set object_keyword to a simple one-word English noun for the object (e.g. "car", "boat", "bicycle") and path to 3-6 keyframes tracing its motion: {"t": seconds from 0, "pos": [x,y,z] offset in scene units from its start point (roughly -80..80 per axis), "yaw": facing angle in degrees, 0 = forward, positive = turning left}. Keep total duration under 8 seconds. Leave motion_prompt empty.
 - demo_type "none": factual/conceptual questions with nothing physical to demonstrate. Leave motion_prompt, object_keyword and path empty/blank.
 - skill: for "human_motion", the movement's plain name in 1-3 lowercase words ("backflip", "push-up", "dance move"). Leave it empty for the other demo types.
-- answer for "human_motion": teach the move. One short sentence introducing it, then 4-6 numbered steps, each on its own line ("1. ...\n2. ..."), in the order the body does them — setup, the key movement, the landing or finish — each a single short, concrete instruction the listener could follow.
+- answer for "human_motion": coach it in 2-3 short sentences of direct instructions, the key cues in the order the body does them (e.g. "Swing your arms up and jump. Tuck your knees to your chest as you rotate. Spot the floor and land with bent knees."). No praise or filler like "it's a great move" or "I can show you".
 - answer for "object_path" or "none": 2-4 short sentences.
-- It will be read aloud, so no markdown beyond the step numbers.`;
+- Keep "answer" short, with no lists or markdown — it will be read aloud.`;
 
 async function callGeminiHelp(question, savedSkills = []) {
     // Naming a saved move exactly is what lets askHelp play that take instead

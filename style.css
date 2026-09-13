@@ -620,9 +620,7 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
 }
 .help-bubble {
     padding: 9px 13px; border-radius: 12px; font-size: 12.5px; line-height: 1.45;
-    font-family: 'DM Sans', sans-serif; max-width: 92%;
-    white-space: pre-line; /* a taught move's numbered steps arrive one per line */
-}
+    font-family: 'DM Sans', sans-serif; max-width: 92%;}
 .help-user {
     align-self: flex-end; background: var(--accent); color: #fff;
     border-bottom-right-radius: 3px;
