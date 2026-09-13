@@ -1,0 +1,29 @@
+# Secrets
+.env
+local-config.js
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp
+*.tmp
+*.log
+
+# Dependencies
+node_modules/
+dist/
+.venv-proxy/
+
+# Env variants
+.env.local
+
+# Local tooling
+.claude/
+.venv/

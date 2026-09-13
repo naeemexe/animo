@@ -1,0 +1,7 @@
+# Motion server (backend/motion_server.py) — needs an NVIDIA GPU.
+fastapi
+uvicorn[standard]
+python-dotenv
+numpy
+torch
+kimodo[all] @ git+https://github.com/nv-tlabs/kimodo.git

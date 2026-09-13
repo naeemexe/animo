@@ -1,0 +1,6 @@
+# Gemini proxy (backend/gemini_proxy.py) — runs anywhere with gcloud ADC.
+fastapi
+uvicorn
+requests
+google-auth
+python-dotenv

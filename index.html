@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animo</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://api.elevenlabs.io" crossorigin>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-mode="create">
+    <div id="topbar">
+        <h1 id="logo-btn" style="cursor:pointer" title="Return to home">ANIMO</h1>
+        <div id="mode-toggle" role="tablist" aria-label="Mode">
+            <button class="mode-btn" id="mode-help" data-mode="help" role="tab">Chat</button>
+            <button class="mode-btn active" id="mode-create" data-mode="create" role="tab">Create</button>
+        </div>
+        <span style="flex:1"></span>
+        <button id="path-toggle" class="create-only" style="padding:5px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:500;display:none">Show Path</button>
+        <div class="create-only" style="width:1px;height:20px;background:var(--border)"></div>
+        <button class="topbar-btn create-only" id="render-btn" title="Render orbit video"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/></svg> Render</button>
+        <input type="file" id="import-file" accept=".animo" style="display:none">
+        <div id="avatar-toggle" class="help-only" role="group" aria-label="Character">
+            <button class="avatar-btn active" id="avatar-male" data-avatar="male" title="Switch character">Male</button>
+            <button class="avatar-btn" id="avatar-female" data-avatar="female" title="Switch character">Female</button>
+        </div>
+        <div class="help-only" style="width:1px;height:20px;background:var(--border)"></div>
+        <div class="create-only" style="width:1px;height:20px;background:var(--border)"></div>
+        <button id="auth-btn" title="Sign in">Sign in</button>
+    </div>
+
+    <div id="main">
+        <div id="viewport">
+            <div id="gen-info" style="display:none"></div>
+            <div id="gen-loading-overlay">
+                <div id="gen-loading-spinner"></div>
+                <div id="gen-loading-text">Generating...</div>
+            </div>
+            <button id="panel-reopen" title="Show activity">&#9776;</button>
+            <div class="recording-badge" id="rec-badge">&#9679; REC</div>
+            <div id="create-controls" class="create-only">
+                <button id="replay-view" class="view-pill" title="Play the whole story from the top">&#9654; Replay</button>
+                <button id="reset-view" class="view-pill" title="Frame the whole cast">Reset View</button>
+            </div>
+            <div id="editor-toolbar" class="create-only">
+                <button class="ed-btn ed-build-only" id="ed-move" title="Move mode (M)" style="display:none"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2v10M2 7h10M7 2l-2 2M7 2l2 2M7 12l-2-2M7 12l2-2M2 7l2-2M2 7l2 2M12 7l-2-2M12 7l-2 2"/></svg> Move</button>
+                <button class="ed-btn ed-build-only" id="ed-rotate" title="Rotate (R)" style="display:none"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7a5 5 0 0 1 10 0"/><path d="M9 4l3 3-3 3"/></svg> Rotate</button>
+                <button class="ed-btn ed-build-only" id="ed-scale" title="Scale (S)" style="display:none"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="4" height="4" rx="1"/><rect x="6" y="6" width="6" height="6" rx="1"/></svg> Scale</button>
+            </div>
+            <div id="model-picker" class="create-only" style="display:none">
+                <div id="mp-header">Models <button id="mp-close">&times;</button></div>
+                <div id="mp-grid"></div>
+            </div>
+            <div id="editor-info" class="create-only"></div>
+            <div id="render-overlay" class="create-only">
+                <div id="render-dot"></div>
+                <div id="render-hint">Click a point to orbit around</div>
+                <div id="render-progress">
+                    <div>Recording...</div>
+                    <div class="render-bar"><div class="render-fill" id="render-fill"></div></div>
+                </div>
+            </div>
+            <div id="help-welcome" class="help-only" style="display:none">
+                <div class="w-examples">
+                    <div class="w-ex" data-prompt="Teach me how to do a proper push-up">
+                        <span class="w-ex-label">Push-up form</span>
+                    </div>
+                    <div class="w-ex" data-prompt="How do I ride a bicycle for the first time">
+                        <span class="w-ex-label">Riding a bike</span>
+                    </div>
+                    <div class="w-ex" data-prompt="Teach me how to do a backflip">
+                        <span class="w-ex-label">Backflip</span>
+                    </div>
+                    <div class="w-ex" data-prompt="What's a good warm-up before running">
+                        <span class="w-ex-label">Warm-up tips</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Text and the input box live in the left panel now (Chat tab) — the
+                 viewport shows only the persona, so nothing here competes with her. -->
+            <button id="help-replay-btn" class="help-only" title="Replay demo" style="display:none">
+                <svg width="12" height="14" viewBox="0 0 10 12"><path d="M1 0.5v11l8.5-5.5z" fill="currentColor"/></svg>
+            </button>
+            <div id="create-welcome" class="create-only">
+                <div class="w-examples">
+                    <div class="w-ex" data-prompt="A person walks down a busy city street surrounded by tall buildings on every side">
+                        <span class="w-ex-label">City</span>
+                    </div>
+                    <div class="w-ex" data-prompt="A person walks through a forest surrounded by tall trees on every side">
+                        <span class="w-ex-label">Forest</span>
+                    </div>
+                </div>
+            </div>
+            <div id="timeline-bar" class="create-only">
+                <div id="timeline-playhead"></div>
+                <div id="timeline-controls">
+                    <button class="tl-btn" id="tl-playpause" title="Play/Pause (Space)"><svg width="10" height="12" viewBox="0 0 10 12"><path d="M1 0.5v11l8.5-5.5z" fill="currentColor"/></svg></button>
+                    <span class="tl-time" id="tl-time">0.0s</span>
+                </div>
+                <div id="timeline-clips"></div>
+
+
+            </div>
+        </div>
+
+        <div id="panel">
+            <div id="panel-header">
+                <button class="panel-tab active create-only" id="tab-activity">Activity</button>
+                <button class="panel-tab create-only" id="tab-add">Library</button>
+                <button class="panel-tab active help-only" id="tab-chat">Chat</button>
+                <button class="panel-tab help-only" id="tab-learned">Learned</button>
+                <div id="panel-collapse-wrap">
+                    <button id="panel-collapse" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:16px" title="Collapse">&times;</button>
+                </div>
+            </div>
+            <div id="console" class="create-only"></div>
+            <div id="chat-input-bar" class="create-only">
+                <input type="text" id="chat-input" placeholder="Describe a scene, then build it up..." autocomplete="off">
+            </div>
+            <div id="add-tab-content">
+                <div id="lib-references">
+                    <div id="lib-references-header">
+                        References <span id="lib-references-hint">style refs for generation</span>
+                    </div>
+                    <div id="lib-references-grid"></div>
+                    <div id="lib-add-reference-wrap">
+                        <input type="text" id="lib-add-reference-input" placeholder="Paste an image URL or a style note...">
+                        <button id="lib-add-reference-btn">Add</button>
+                        <input type="file" id="lib-add-reference-file" accept="image/*" style="display:none">
+                    </div>
+                </div>
+                <div id="add-tab-grid"></div>
+            </div>
+            <div id="chat-tab-content" class="help-only" style="display:none">
+                <div id="help-chat-log"></div>
+                <div id="help-input-wrap">
+                    <input type="text" id="help-input" placeholder="Ask anything, or teach me something..." autocomplete="off">
+                    <button id="help-mic-btn" title="Voice input (coming soon)">&#127908;</button>
+                </div>
+            </div>
+            <div id="learned-tab-content" class="help-only" style="display:none">
+                <div id="learned-hint">Skills you've asked about, remembered across sessions.</div>
+                <div id="learned-list"></div>
+            </div>
+        </div>
+        <!-- Hidden elements for JS references -->
+        <textarea id="prompt-input" style="display:none"></textarea>
+        <input id="duration-input" type="hidden" value="5">
+        <button id="generate-btn" style="display:none">Generate</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.3/lib/three-vrm.module.js"
+        }
+    }
+    </script>
+    <script src="local-config.js" onerror="console.warn('local-config.js not found — copy local-config.example.js to local-config.js and fill it in')"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
