@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid slice">
+  <!-- Sign-in backdrop: a painted valley at golden hour (sky, clouds, far mountains,
+       a castle town, a river and green hills). Shown heavily blurred, so shapes are
+       broad on purpose; colour and composition are what carry it. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a996cf"/>
+      <stop offset="0.35" stop-color="#e3b8cf"/>
+      <stop offset="0.62" stop-color="#f6dcc0"/>
+      <stop offset="1" stop-color="#f3e6c8"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.62" cy="0.3" r="0.35">
+      <stop offset="0" stop-color="#fff6d2" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#fff6d2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c7c3e6"/>
+      <stop offset="1" stop-color="#9fb0d8"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9c4e6"/>
+      <stop offset="1" stop-color="#5f74aa"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="720" fill="url(#sky)"/>
+  <rect width="1200" height="720" fill="url(#sun)"/>
+
+  <g fill="#ffe7a0" opacity="0.9">
+    <ellipse cx="170" cy="120" rx="150" ry="70"/>
+    <ellipse cx="260" cy="170" rx="130" ry="60"/>
+    <ellipse cx="90" cy="190" rx="110" ry="50"/>
+    <ellipse cx="760" cy="110" rx="160" ry="80"/>
+    <ellipse cx="880" cy="160" rx="150" ry="65"/>
+    <ellipse cx="660" cy="170" rx="120" ry="55"/>
+  </g>
+  <g fill="#f6c98e" opacity="0.55">
+    <ellipse cx="200" cy="210" rx="170" ry="35"/>
+    <ellipse cx="800" cy="205" rx="190" ry="35"/>
+  </g>
+
+  <path d="M0 300 L140 240 L260 270 L380 220 L520 150 L640 230 L760 250 L880 200 L1000 170 L1100 150 L1200 190 L1200 360 L0 360 Z" fill="url(#haze)" opacity="0.9"/>
+
+  <g fill="#cdb9d6" opacity="0.9">
+    <rect x="700" y="230" width="80" height="80"/>
+    <rect x="775" y="195" width="22" height="115"/>
+    <rect x="980" y="170" width="18" height="140"/>
+    <rect x="1010" y="150" width="16" height="160"/>
+    <rect x="860" y="250" width="160" height="60"/>
+  </g>
+  <rect x="600" y="298" width="420" height="40" fill="#8e8aa6" opacity="0.85"/>
+  <g fill="#c56a58" opacity="0.85">
+    <polygon points="620,300 660,270 700,300"/>
+    <polygon points="720,300 760,262 800,300"/>
+    <polygon points="820,300 860,268 900,300"/>
+    <polygon points="900,300 945,262 990,300"/>
+  </g>
+
+  <path d="M0 330 C120 300 260 320 380 350 C300 380 150 400 0 420 Z" fill="#79b35c"/>
+  <path d="M520 340 C640 320 900 320 1080 330 C1150 335 1200 340 1200 350 L1200 420 C1000 440 700 440 520 400 Z" fill="#6aa653"/>
+
+  <path d="M0 470 C200 420 420 390 560 400 C760 415 980 430 1200 380 L1200 560 C980 600 760 580 520 600 C320 615 140 640 0 660 Z" fill="url(#river)"/>
+  <ellipse cx="1050" cy="470" rx="130" ry="30" fill="#e9eefc" opacity="0.55"/>
+
+  <path d="M0 420 C80 400 200 400 300 420 C280 460 200 470 130 480 C80 490 40 500 0 510 Z" fill="#a99a86"/>
+  <path d="M0 400 C90 380 210 385 320 405 C300 420 200 425 100 430 C60 432 30 436 0 440 Z" fill="#86bd62"/>
+  <path d="M300 395 L470 380 L472 392 L302 407 Z" fill="#9c93a8"/>
+
+  <g fill="#4f9a45">
+    <circle cx="980" cy="600" r="70"/>
+    <circle cx="1080" cy="560" r="80"/>
+    <circle cx="1170" cy="600" r="90"/>
+    <circle cx="880" cy="660" r="80"/>
+    <circle cx="760" cy="700" r="70"/>
+  </g>
+  <g fill="#6cb85a">
+    <circle cx="1040" cy="620" r="60"/>
+    <circle cx="930" cy="690" r="60"/>
+    <circle cx="1150" cy="690" r="70"/>
+  </g>
+
+  <path d="M0 520 C80 510 160 540 240 600 C300 650 330 700 340 720 L0 720 Z" fill="#6fb04e"/>
+  <path d="M0 600 C60 590 140 620 200 680 L210 720 L0 720 Z" fill="#8cc964"/>
+</svg>

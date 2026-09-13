@@ -11,6 +11,19 @@
 </head>
 <body data-mode="help">
     <div id="auth-screen">
+        <div id="auth-bg"></div>
+        <!-- Site header and footer so the page reads like a front door; the links are placeholders for now. -->
+        <nav id="auth-nav">
+            <span class="auth-logo">ANIMO</span>
+            <div class="auth-links">
+                <button type="button" class="auth-link current">Home</button>
+                <button type="button" class="auth-link">Products</button>
+                <button type="button" class="auth-link">About</button>
+                <button type="button" class="auth-link">Services</button>
+                <button type="button" class="auth-link">Contact</button>
+            </div>
+            <button type="button" class="auth-cta">Get started</button>
+        </nav>
         <div id="auth-card">
             <h2 class="w-title">Animo 1.0</h2>
             <p class="w-subtitle">Build a scene, one instruction at a time</p>
@@ -24,6 +37,12 @@
                 </div>
             </form>
         </div>
+        <footer id="auth-footer">
+            <span>© 2026 Animo</span>
+            <button type="button" class="auth-foot-link">Privacy</button>
+            <button type="button" class="auth-foot-link">Terms</button>
+            <button type="button" class="auth-foot-link">Visit us</button>
+        </footer>
     </div>
     <!-- Already signed in: skip the sign-in page before app.js (slow to load) gets the chance to. -->
     <script>if (localStorage.getItem('animo_session')) document.getElementById('auth-screen').style.display = 'none';</script>

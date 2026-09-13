@@ -725,3 +725,168 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
     color: #fff; font-size: 11px; font-weight: 600; cursor: pointer;
 }
 #lib-add-reference-btn:hover { background: var(--accent-hover); }
+
+/* ===================== Liquid glass ===================== */
+/* A layer over the styles above, in the spirit of Apple's Liquid Glass:
+   see-through surfaces that blur and saturate what's behind them, a bright
+   inner edge along the top like light catching a lens, soft shadows, pill
+   shapes, and the accent as a glossy lens for whatever is selected. It only
+   restyles surfaces — paddings and widths are left alone so the layout
+   (the topbar's --app-min guarantee included) is unchanged — and it can be
+   removed as one block. */
+:root {
+    --lg-bg: linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.3) 100%);
+    --lg-bg-hover: linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.45) 100%);
+    --lg-edge: rgba(255,255,255,0.7);
+    --lg-blur: blur(20px) saturate(180%);
+    --lg-shadow: inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(255,255,255,0.2), 0 4px 16px rgba(60,80,25,0.1);
+    --lg-accent: linear-gradient(180deg, #9cbd55 0%, #7c9a3e 55%, #6b8535 100%);
+    --lg-accent-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.08), 0 3px 10px rgba(90,120,40,0.35);
+}
+
+/* Bars and panels */
+#topbar {
+    background: rgba(255,255,255,0.32); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+    border-bottom: 1px solid var(--lg-edge);
+    box-shadow: inset 0 -1px 0 rgba(163,189,110,0.2), 0 4px 24px rgba(60,80,25,0.06);
+}
+#panel {
+    background: rgba(255,255,255,0.28); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+    border-right: 1px solid var(--lg-edge);
+}
+#timeline-bar {
+    background: rgba(255,255,255,0.4); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-edge); border-radius: 16px; box-shadow: var(--lg-shadow);
+}
+
+/* Segmented toggles: a glass track with the selected option as an accent lens */
+#mode-toggle, #avatar-toggle {
+    background: var(--lg-bg); border: 1px solid var(--lg-edge); border-radius: 999px;
+    box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+}
+.mode-btn, .avatar-btn { border-radius: 999px; }
+.mode-btn:hover:not(.active), .avatar-btn:hover:not(.active):not(:disabled) { background: rgba(255,255,255,0.5); }
+.mode-btn.active, .avatar-btn.active { background: var(--lg-accent); box-shadow: var(--lg-accent-shadow); }
+
+/* Panel tabs become glass pills instead of underlined text */
+#panel-header { padding: 6px; gap: 4px; }
+.panel-tab { padding: 8px 16px; border: 1px solid transparent; border-radius: 999px; }
+.panel-tab:hover { background: rgba(255,255,255,0.45); }
+.panel-tab.active {
+    background: var(--lg-bg); border-color: var(--lg-edge); box-shadow: var(--lg-shadow); color: var(--accent);
+}
+
+/* Buttons and pills */
+.topbar-btn, #auth-btn, .view-pill, .ed-btn, #panel-reopen, .w-ex {
+    background: var(--lg-bg); border: 1px solid var(--lg-edge); border-radius: 999px;
+    box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+}
+#path-toggle { /* its look is set inline, so it needs !important to join in */
+    background: var(--lg-bg) !important; border: 1px solid var(--lg-edge) !important;
+    border-radius: 999px !important; box-shadow: var(--lg-shadow);
+}
+.topbar-btn:hover, #auth-btn:hover, .view-pill:hover, .ed-btn:hover, #panel-reopen:hover, .w-ex:hover {
+    background: var(--lg-bg-hover); border-color: var(--lg-edge); color: var(--accent);
+}
+.topbar-btn.active, .ed-btn.active, #path-toggle.active, .view-pill.primary, .view-pill.primary:hover {
+    background: var(--lg-accent) !important; border-color: rgba(255,255,255,0.35) !important;
+    box-shadow: var(--lg-accent-shadow); color: #fff;
+}
+.tl-btn { border-radius: 999px; }
+.tl-btn:hover { background: rgba(255,255,255,0.6); }
+#help-replay-btn { background: var(--lg-accent); box-shadow: var(--lg-accent-shadow), 0 6px 18px rgba(90,120,40,0.3); }
+
+/* Text inputs */
+#help-input, #chat-input, #auth-form input {
+    background: rgba(255,255,255,0.45); border: 1px solid var(--lg-edge); border-radius: 999px;
+    box-shadow: inset 0 1px 3px rgba(60,80,25,0.08);
+    backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+}
+#help-input:focus, #chat-input:focus, #auth-form input:focus {
+    border-color: var(--accent); box-shadow: inset 0 1px 3px rgba(60,80,25,0.08), 0 0 0 3px rgba(124,154,62,0.18);
+}
+#auth-form input { padding: 0 16px; }
+
+/* Sign-in page: soft colour behind the page gives the glass card something to bend */
+#auth-screen {
+    background:
+        radial-gradient(38% 34% at 24% 30%, rgba(176,208,104,0.55), transparent 70%),
+        radial-gradient(34% 30% at 78% 72%, rgba(140,196,206,0.4), transparent 70%),
+        radial-gradient(28% 24% at 72% 18%, rgba(255,226,150,0.45), transparent 70%),
+        linear-gradient(160deg, #f4f8e8 0%, #eaf2d8 45%, #dfeec8 100%);
+}
+#auth-card {
+    position: relative; width: 380px; padding: 40px 36px 30px; border-radius: 28px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.22) 100%);
+    border: 1px solid rgba(255,255,255,0.75);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(60,80,25,0.16);
+    backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+/* A diagonal sheen across the card's top, like light on curved glass */
+#auth-card::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 38%);
+}
+#auth-form { margin-top: 28px; }
+#auth-actions button { border-radius: 999px; }
+#auth-actions button:not(.auth-primary) {
+    background: var(--lg-bg); border: 1px solid var(--lg-edge); box-shadow: var(--lg-shadow);
+}
+#auth-actions button:not(.auth-primary):hover { background: var(--lg-bg-hover); }
+#auth-actions .auth-primary, #auth-actions .auth-primary:hover {
+    background: var(--lg-accent); border-color: rgba(255,255,255,0.35); box-shadow: var(--lg-accent-shadow);
+}
+#auth-actions .auth-primary:hover { filter: brightness(1.05); }
+
+/* ===================== Sign-in page: scene and site chrome ===================== */
+/* A painted valley behind everything, blurred like a lens out of focus, so the
+   page opens on Animo's soft storybook world (assets/login-bg.svg). */
+#auth-bg {
+    position: absolute; inset: -48px; z-index: 0; pointer-events: none;
+    background: url('assets/login-bg.svg') center / cover no-repeat;
+    filter: blur(14px) saturate(1.15);
+}
+#auth-bg::after { content: ''; position: absolute; inset: 0; background: rgba(255,248,236,0.16); }
+#auth-card { z-index: 1; }
+
+#auth-nav {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 1;
+    width: min(1100px, calc(100% - 40px)); height: 56px;
+    display: flex; align-items: center; gap: 12px; padding: 0 8px 0 24px;
+    background: var(--lg-bg); border: 1px solid var(--lg-edge); border-radius: 999px;
+    box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+}
+.auth-logo { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 600; letter-spacing: 3px; color: var(--accent); }
+.auth-links { display: flex; gap: 4px; margin: 0 auto; }
+.auth-link, .auth-cta, .auth-foot-link { cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+.auth-link {
+    padding: 8px 16px; border-radius: 999px; border: 1px solid transparent; background: none;
+    font-size: 13px; font-weight: 500; color: var(--text-2);
+}
+.auth-link:hover {
+    background: var(--lg-bg-hover); border-color: var(--lg-edge); box-shadow: var(--lg-shadow);
+    color: var(--accent); transform: translateY(-1px);
+}
+.auth-link.current { color: var(--text); background: rgba(255,255,255,0.4); border-color: var(--lg-edge); }
+.auth-cta {
+    padding: 10px 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.35);
+    background: var(--lg-accent); box-shadow: var(--lg-accent-shadow); color: #fff; font-size: 13px; font-weight: 600;
+}
+.auth-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+#auth-footer {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 1;
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 18px; white-space: nowrap;
+    background: var(--lg-bg); border: 1px solid var(--lg-edge); border-radius: 999px;
+    box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text-2);
+}
+#auth-footer > span { margin-right: 8px; }
+.auth-foot-link { padding: 5px 12px; border-radius: 999px; border: none; background: none; font-size: 12px; color: var(--text-2); }
+.auth-foot-link:hover { background: rgba(255,255,255,0.65); color: var(--accent); }
+
+/* Narrow windows: the links would crowd the logo, so only the call to action stays. */
+@media (max-width: 760px) {
+    .auth-links { display: none; }
+    #auth-nav .auth-cta { margin-left: auto; }
+}
