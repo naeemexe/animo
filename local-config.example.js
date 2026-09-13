@@ -28,6 +28,11 @@ window.ANIMO_ELEVENLABS_KEY = '';
 // Pin exact voices (Voice Library -> a voice -> ID); otherwise defaults are used.
 // window.ANIMO_ELEVENLABS_VOICES = { male: 'voice_id', female: 'voice_id' };
 
+// ---- You ------------------------------------------------------------------
+// Shown in Chat's empty state ("Hi <name>, let's get into it"). Leave it unset
+// and the greeting simply drops the name.
+// window.ANIMO_USER_NAME = '';
+
 // ---- Auth0 (planned — sign-in isn't wired up yet) --------------------------
 // Public SPA settings from your Auth0 application. See README -> Integrations.
 // window.ANIMO_AUTH0_DOMAIN = 'your-tenant.us.auth0.com';

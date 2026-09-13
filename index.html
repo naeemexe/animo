@@ -9,21 +9,22 @@
     <link rel="preconnect" href="https://api.elevenlabs.io" crossorigin>
     <link rel="stylesheet" href="style.css">
 </head>
-<body data-mode="create">
+<body data-mode="help">
     <div id="topbar">
         <h1 id="logo-btn" style="cursor:pointer" title="Return to home">ANIMO</h1>
         <div id="mode-toggle" role="tablist" aria-label="Mode">
-            <button class="mode-btn" id="mode-help" data-mode="help" role="tab">Chat</button>
-            <button class="mode-btn active" id="mode-create" data-mode="create" role="tab">Create</button>
+            <button class="mode-btn active" id="mode-help" data-mode="help" role="tab">Chat</button>
+            <button class="mode-btn" id="mode-create" data-mode="create" role="tab">Create</button>
         </div>
+        <button class="topbar-btn create-only" id="clear-scene-btn" title="Remove everything and start a new scene"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5h8M4.75 3.5V2.25h2.5V3.5M3 3.5l.5 6.5h5l.5-6.5"/></svg> <span>Clear Scene</span></button>
         <span style="flex:1"></span>
         <button id="path-toggle" class="create-only" style="padding:5px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:500;display:none">Show Path</button>
         <div class="create-only" style="width:1px;height:20px;background:var(--border)"></div>
-        <button class="topbar-btn create-only" id="render-btn" title="Render orbit video"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/></svg> Render</button>
+        <button class="topbar-btn create-only" id="render-btn" title="Export orbit video"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><circle cx="6" cy="6" r="1.5" fill="currentColor" stroke="none"/></svg> Export</button>
         <input type="file" id="import-file" accept=".animo" style="display:none">
         <div id="avatar-toggle" class="help-only" role="group" aria-label="Character">
-            <button class="avatar-btn active" id="avatar-male" data-avatar="male" title="Switch character">Male</button>
-            <button class="avatar-btn" id="avatar-female" data-avatar="female" title="Switch character">Female</button>
+            <button class="avatar-btn active" id="avatar-male" data-avatar="male" title="Switch character">One</button>
+            <button class="avatar-btn" id="avatar-female" data-avatar="female" title="Switch character">Two</button>
         </div>
         <div class="help-only" style="width:1px;height:20px;background:var(--border)"></div>
         <div class="create-only" style="width:1px;height:20px;background:var(--border)"></div>
@@ -61,28 +62,17 @@
                     <div class="render-bar"><div class="render-fill" id="render-fill"></div></div>
                 </div>
             </div>
-            <div id="help-welcome" class="help-only" style="display:none">
-                <div class="w-examples">
-                    <div class="w-ex" data-prompt="Teach me how to do a proper push-up">
-                        <span class="w-ex-label">Push-up form</span>
-                    </div>
-                    <div class="w-ex" data-prompt="How do I ride a bicycle for the first time">
-                        <span class="w-ex-label">Riding a bike</span>
-                    </div>
-                    <div class="w-ex" data-prompt="Teach me how to do a backflip">
-                        <span class="w-ex-label">Backflip</span>
-                    </div>
-                    <div class="w-ex" data-prompt="What's a good warm-up before running">
-                        <span class="w-ex-label">Warm-up tips</span>
-                    </div>
-                </div>
-            </div>
+            <div id="help-welcome" class="help-only" style="display:none"></div>
             <!-- Text and the input box live in the left panel now (Chat tab) — the
                  viewport shows only the persona, so nothing here competes with her. -->
             <button id="help-replay-btn" class="help-only" title="Replay demo" style="display:none">
                 <svg width="12" height="14" viewBox="0 0 10 12"><path d="M1 0.5v11l8.5-5.5z" fill="currentColor"/></svg>
             </button>
             <div id="create-welcome" class="create-only">
+                <div id="create-intro">
+                    <h2 class="w-title">Animo 1.0</h2>
+                    <p class="w-subtitle">Build a scene, one instruction at a time</p>
+                </div>
                 <div class="w-examples">
                     <div class="w-ex" data-prompt="A person walks down a busy city street surrounded by tall buildings on every side">
                         <span class="w-ex-label">City</span>
@@ -133,7 +123,7 @@
                 <div id="add-tab-grid"></div>
             </div>
             <div id="chat-tab-content" class="help-only" style="display:none">
-                <div id="help-chat-log"></div>
+                <div id="help-chat-log"><div id="help-greeting"></div></div>
                 <div id="help-input-wrap">
                     <input type="text" id="help-input" placeholder="Ask anything, or teach me something..." autocomplete="off">
                     <button id="help-mic-btn" title="Voice input (coming soon)">&#127908;</button>
