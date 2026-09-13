@@ -40,12 +40,29 @@ const GEMINI_URL = USE_VERTEX_PROXY
 async function fetchGeminiWithRetry(url, body, maxRetries = 3) {
     let lastData = null;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const data = await res.json();
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        } catch (err) {
+            // fetch() rejects outright for a dead server, a refused connection
+            // or a missing CORS header — there's no response to read. Name the
+            // endpoint: a bare "Failed to fetch" sends you hunting in the
+            // wrong place (it reads like a Gemini problem, not a local one).
+            return { error: { status: 'UNREACHABLE', message: `Can't reach Gemini at ${url} — ${err.message}. Is the proxy running?` } };
+        }
+        // Read as text first: an error page (or a bare "Internal Server Error")
+        // isn't JSON, and res.json() would throw with nothing left to inspect.
+        const raw = await res.text();
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch {
+            return { error: { status: 'BAD_RESPONSE', message: `Gemini endpoint returned ${res.status} ${res.statusText || ''} — ${raw.slice(0, 200) || '(empty body)'}` } };
+        }
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return data;
         lastData = data;

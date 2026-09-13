@@ -45,7 +45,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],   # local dev only — this never leaves your machine
-    allow_methods=["POST"],
+    allow_methods=["POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -75,6 +75,27 @@ def get_access_token() -> str:
             )
     _credentials.refresh(_auth_request)  # no-op if the cached token still has time left
     return _credentials.token
+
+
+# An unhandled exception escapes as a bare text/plain 500 that never passes
+# through CORSMiddleware, so the browser can only report "Failed to fetch" and
+# the real reason is lost. Returning it as a normal response keeps the CORS
+# headers and shapes the payload like Gemini's own errors, which the frontend
+# already knows how to read.
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"status": "PROXY_ERROR", "message": f"{type(exc).__name__}: {exc}"}},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"status": "PROXY_ERROR", "message": str(exc.detail)}},
+    )
 
 
 @app.get("/health")
