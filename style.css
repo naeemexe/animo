@@ -843,8 +843,7 @@ body[data-mode="help"] #panel:not(.collapsed) { width: 50%; }
    page opens on Animo's soft storybook world (assets/login-bg.svg). */
 #auth-bg {
     position: absolute; inset: -48px; z-index: 0; pointer-events: none;
-    /* assets/login-bg.jpeg is the chosen backdrop; the painted SVG shows if that file is missing. */
-    background: url('assets/login-bg.jpeg') center / cover no-repeat, url('assets/login-bg.svg') center / cover no-repeat;
+    background: url('assets/login-bg.jpeg') center / cover no-repeat;
     filter: blur(24px) saturate(1.15);
 }
 #auth-bg::after { content: ''; position: absolute; inset: 0; background: rgba(255,248,236,0.16); }
